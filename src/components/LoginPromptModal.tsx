@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 
@@ -10,8 +11,8 @@ export function LoginPromptModal() {
     signInWithGoogle();
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
       <div className="relative bg-white w-full sm:max-w-sm rounded-t-[24px] sm:rounded-[24px] px-6 pt-8 pb-10 shadow-xl flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-[14px] bg-[#f4e5ff] flex items-center justify-center mb-4">
@@ -47,6 +48,7 @@ export function LoginPromptModal() {
           가입하면 <span className="text-[#ae49fd]">같이바코할사람</span> 이용약관에 동의하게 됩니다
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
