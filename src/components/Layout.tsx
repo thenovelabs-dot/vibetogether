@@ -16,7 +16,6 @@ const PROFILE_PATH = "/mypage";
 const ALL_TAB_PATHS = [...MAIN_TABS.map((t) => t.path), PROFILE_PATH];
 
 const NEW_ACTION: Record<string, { label: string; to: string }> = {
-  "/home":    { label: "모임 등록하기", to: "/meetup/new"  },
   "/meetup":  { label: "모임 등록하기", to: "/meetup/new"  },
   "/board":   { label: "글쓰기",        to: "/board/new"   },
   "/product": { label: "프로젝트 등록", to: "/product/new" },
