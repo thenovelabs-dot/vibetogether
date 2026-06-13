@@ -16,7 +16,6 @@ const PROFILE_PATH = "/mypage";
 const ALL_TAB_PATHS = [...MAIN_TABS.map((t) => t.path), PROFILE_PATH];
 
 const NEW_ACTION: Record<string, { label: string; to: string }> = {
-  "/home":     { label: "모임 등록하기", to: "/meetup/new"  },
   "/board":    { label: "글쓰기",       to: "/board/new"   },
   "/product": { label: "프로젝트 등록", to: "/product/new" },
 };
@@ -404,8 +403,8 @@ export default function Layout() {
         <main className={`flex-1 overflow-y-auto pb-16 lg:pb-0 ${isFormPage ? "bg-white" : "bg-[#fafbfb]"}`}>
           <div
             key={pathname}
-            className={`animate-page-enter ${pathname === "/feed" ? "h-full" : "mx-auto h-full"}`}
-            style={pathname === "/feed" ? {} : { maxWidth: "800px" }}
+            className={`animate-page-enter ${["/feed", "/home"].includes(pathname) ? "h-full" : "mx-auto h-full"}`}
+            style={["/feed", "/home"].includes(pathname) ? {} : { maxWidth: "800px" }}
           >
             <Outlet />
           </div>
