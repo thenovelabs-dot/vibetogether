@@ -233,7 +233,7 @@ function MeetupCard({ meetup, onClick }: { meetup: Meetup; onClick: () => void }
         </div>
         <div className="flex items-center gap-[6px]">
           <img src="/icons/group.svg" width={18} height={18} className="shrink-0 opacity-60" />
-          <span className="text-[14px] text-[#6a7282] tracking-[-0.32px]">최대 {meetup.capacity}명</span>
+          <span className="text-[14px] text-[#6a7282] tracking-[-0.32px]">{meetup.accepted_count}/{meetup.capacity}명 참여</span>
         </div>
       </div>
       <div className="w-full border-t border-[#f3f4f6] pt-3 flex items-center justify-between">

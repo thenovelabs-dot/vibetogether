@@ -257,12 +257,9 @@ export default function MeetupDetailScreen() {
               </div>
               <div className="flex items-center gap-2">
                 <img src="/icons/group.svg" width={22} height={22} className="shrink-0 opacity-60" />
-                <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">최대 {meetup.capacity}명</span>
-                {meetup.accepted_count > 0 && (
-                  <span className="text-[14px] font-bold text-[#ae49fd] tracking-[-0.32px]">
-                    {meetup.accepted_count}/{meetup.capacity}명 참여중
-                  </span>
-                )}
+                <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">
+                  {meetup.accepted_count}/{meetup.capacity}명 참여중
+                </span>
               </div>
             </div>
           </div>
