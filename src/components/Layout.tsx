@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useState, useRef, useEffect } from "react"; // useRef/useEffect used in NotificationBell
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "../contexts/UserContext";
 import { getNotifications, type Notification } from "../api/notifications";
 import { useNavigationGuard } from "../contexts/NavigationGuardContext";
@@ -93,6 +93,21 @@ function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const fetchNotifications = useCallback(() => {
+    if (!session) return;
+    getNotifications(session.user.id)
+      .then(setNotifications)
+      .catch(() => {});
+  }, [session]);
+
+  // 마운트 시 + 60초 폴링
+  useEffect(() => {
+    fetchNotifications();
+    const timer = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(timer);
+  }, [fetchNotifications]);
+
+  // 벨 열 때 즉시 갱신 + 로딩 표시
   useEffect(() => {
     if (!open || !session) return;
     setLoading(true);
