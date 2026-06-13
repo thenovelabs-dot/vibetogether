@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { isViewCountOnlyUpdate } from "../lib/realtime";
 import { useNavigate } from "react-router-dom";
 import { getMeetups, type Meetup } from "../api/meetups";
 import { getPosts, type BoardPost } from "../api/board";
@@ -100,10 +101,12 @@ export default function FeedScreen() {
   }, [fetchFeed]);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (payload: any) => { if (!isViewCountOnlyUpdate(payload)) fetchFeed(); };
     const channel = supabase
       .channel("feed_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, fetchFeed)
-      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, fetchFeed)
+      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, handler)
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, handler)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchFeed]);

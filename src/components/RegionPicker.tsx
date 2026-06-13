@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ALL_REGIONS, REGIONS_BY_CITY } from "../lib/regions";
+import { ALL_REGIONS, REGIONS_BY_CITY, regionKey, regionDisplay } from "../lib/regions";
 
 interface RegionPickerProps {
   value: string;
@@ -13,8 +13,8 @@ export function RegionPicker({ value, onChange }: RegionPickerProps) {
     ? ALL_REGIONS.filter((r) => r.name.includes(query.trim()) || r.city.includes(query.trim()))
     : [];
 
-  function pick(name: string) {
-    onChange(name);
+  function pick(key: string) {
+    onChange(key);
     setQuery("");
   }
 
@@ -24,7 +24,7 @@ export function RegionPicker({ value, onChange }: RegionPickerProps) {
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[#99a1af] tracking-[-0.32px]">선택됨</span>
           <span className="h-[23px] px-[7px] py-[3px] bg-[#101828] text-white rounded-full text-[12px] font-medium tracking-[-0.32px]">
-            {value}
+            {regionDisplay(value)}
           </span>
         </div>
       )}
@@ -48,19 +48,22 @@ export function RegionPicker({ value, onChange }: RegionPickerProps) {
             <p className="text-[14px] text-[#99a1af] text-center py-4">검색 결과 없음</p>
           ) : (
             <div className="flex flex-wrap gap-[4px] p-3">
-              {results.map((r) => (
-                <button
-                  key={`${r.city}-${r.name}`}
-                  type="button"
-                  onClick={() => pick(r.name)}
-                  className={`h-[23px] px-[7px] py-[3px] rounded-full text-[12px] font-medium tracking-[-0.32px] transition-colors ${
-                    value === r.name ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f] hover:bg-[#e9eaec]"
-                  }`}
-                >
-                  {r.name}
-                  <span className="text-[10px] opacity-60 ml-1">{r.city}</span>
-                </button>
-              ))}
+              {results.map((r) => {
+                const key = regionKey(r.city, r.name);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => pick(key)}
+                    className={`h-[23px] px-[7px] py-[3px] rounded-full text-[12px] font-medium tracking-[-0.32px] transition-colors ${
+                      value === key ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f] hover:bg-[#e9eaec]"
+                    }`}
+                  >
+                    {r.name}
+                    <span className="text-[10px] opacity-60 ml-1">{r.city}</span>
+                  </button>
+                );
+              })}
             </div>
           )
         ) : (
@@ -69,18 +72,21 @@ export function RegionPicker({ value, onChange }: RegionPickerProps) {
               <div key={city} className="px-[12px] pt-[8px] pb-[12px] border-b border-[#f9fafb] last:border-0">
                 <p className="text-[12px] font-medium text-[#99a1af] mb-[6px] tracking-[-0.32px]">{city}</p>
                 <div className="flex flex-wrap gap-[4px]">
-                  {regions.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => onChange(r)}
-                      className={`h-[23px] px-[7px] py-[3px] rounded-full text-[12px] font-medium tracking-[-0.32px] transition-colors ${
-                        value === r ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f] hover:bg-[#e9eaec]"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+                  {regions.map((r) => {
+                    const key = regionKey(city, r);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => onChange(key)}
+                        className={`h-[23px] px-[7px] py-[3px] rounded-full text-[12px] font-medium tracking-[-0.32px] transition-colors ${
+                          value === key ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f] hover:bg-[#e9eaec]"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}

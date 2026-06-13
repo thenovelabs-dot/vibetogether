@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { regionKey, NAVER_AREA1_TO_CITY } from "./regions";
 
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   const { data, error } = await supabase.functions.invoke("naver-geocode", {
@@ -8,8 +9,12 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   if (error) throw new Error("역지오코딩 실패");
 
   const region = data?.results?.[0]?.region;
+  const area1Raw: string = region?.area1?.name ?? "";
   const area2: string = region?.area2?.name ?? "";
   const area3: string = region?.area3?.name ?? "";
+
+  const city = NAVER_AREA1_TO_CITY[area1Raw];
+  if (city && area2) return regionKey(city, area2);
   return area2 || area3 || "알 수 없는 위치";
 }
 

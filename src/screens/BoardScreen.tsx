@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { isViewCountOnlyUpdate } from "../lib/realtime";
 import { useNavigate } from "react-router-dom";
 import { getPosts, type BoardPost } from "../api/board";
 import { BoardPostSkeleton } from "../components/Skeleton";
@@ -54,7 +55,10 @@ export default function BoardScreen() {
   useEffect(() => {
     const channel = supabase
       .channel("board_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, fetchPosts)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, (payload: any) => {
+        if (!isViewCountOnlyUpdate(payload)) fetchPosts();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchPosts]);

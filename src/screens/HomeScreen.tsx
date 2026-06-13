@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { getMeetups, type Meetup } from "../api/meetups";
-import { ALL_REGIONS } from "../lib/regions";
+import { ALL_REGIONS, regionKey, regionDisplay } from "../lib/regions";
+import { isViewCountOnlyUpdate } from "../lib/realtime";
 import { supabase } from "../lib/supabase";
 import { MeetupCardSkeleton } from "../components/Skeleton";
 import { UserAvatar } from "../components/UserAvatar";
@@ -53,7 +54,11 @@ export default function HomeScreen() {
   useEffect(() => {
     const channel = supabase
       .channel("meetups_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, fetchMeetups)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, (payload: any) => {
+        if (isViewCountOnlyUpdate(payload)) return;
+        fetchMeetups();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchMeetups]);
@@ -62,11 +67,13 @@ export default function HomeScreen() {
     activeRegion === "all"
       ? meetups
       : activeRegion === "mine"
-      ? (userRegion ? meetups.filter((m) => m.region === userRegion) : meetups)
+      ? meetups.filter((m) => m.region === userRegion)
       : meetups.filter((m) => m.region === activeRegion);
 
   const activeLabel =
-    activeRegion === "all" ? "전체" : activeRegion === "mine" ? (userRegion || "내 지역") : activeRegion;
+    activeRegion === "all" ? "전체"
+    : activeRegion === "mine" ? (userRegion ? regionDisplay(userRegion) : "내 지역")
+    : regionDisplay(activeRegion);
 
   return (
     <div className="flex flex-col h-full" onClick={() => setShowSort(false)}>
@@ -112,12 +119,15 @@ export default function HomeScreen() {
           전체
         </button>
         <button
-          onClick={() => setActiveRegion("mine")}
+          onClick={() => {
+            if (!userRegion) { navigate("/mypage"); return; }
+            setActiveRegion("mine");
+          }}
           className={`shrink-0 px-4 py-2 rounded-full text-[14px] font-semibold transition-colors tracking-[-0.32px] ${
-            activeRegion === "mine" ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f]"
+            activeRegion === "mine" && userRegion ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f]"
           }`}
         >
-          {userRegion || "내 지역"}
+          {userRegion ? regionDisplay(userRegion) : "내 지역"}
         </button>
         {extraRegions.map((r) => (
           <div
@@ -126,7 +136,7 @@ export default function HomeScreen() {
               activeRegion === r ? "bg-[#101828] text-white pl-4 pr-2" : "bg-[#f3f4f6] text-[#636e7f] px-4"
             }`}
           >
-            <button onClick={() => setActiveRegion(r)}>{r}</button>
+            <button onClick={() => setActiveRegion(r)}>{regionDisplay(r)}</button>
             {activeRegion === r && (
               <button
                 onClick={(e) => { e.stopPropagation(); setExtraRegions((prev) => prev.filter((x) => x !== r)); setActiveRegion("mine"); }}
@@ -151,7 +161,7 @@ export default function HomeScreen() {
       {adding && (
         <RegionAddModal
           excludes={[userRegion, ...extraRegions]}
-          onAdd={(r) => { setExtraRegions((prev) => [...prev, r]); setActiveRegion(r); setAdding(false); }}
+          onAdd={(key) => { setExtraRegions((prev) => [...prev, key]); setActiveRegion(key); setAdding(false); }}
           onClose={() => setAdding(false)}
         />
       )}
@@ -215,7 +225,7 @@ function MeetupCard({ meetup, onClick }: { meetup: Meetup; onClick: () => void }
       <div className="flex flex-col gap-[6px]">
         <div className="flex items-center gap-[6px]">
           <img src="/icons/location.svg" width={18} height={18} className="shrink-0 opacity-60" />
-          <span className="text-[14px] text-[#6a7282] tracking-[-0.32px]">{meetup.place_name || meetup.region}</span>
+          <span className="text-[14px] text-[#6a7282] tracking-[-0.32px]">{meetup.place_name || regionDisplay(meetup.region)}</span>
         </div>
         <div className="flex items-center gap-[6px]">
           <img src="/icons/calender.svg" width={18} height={18} className="shrink-0 opacity-60" />
@@ -255,7 +265,7 @@ function RegionAddModal({ excludes, onAdd, onClose }: {
 
   const suggestions = query.trim().length >= 1
     ? ALL_REGIONS
-        .filter((r) => (r.name.includes(query.trim()) || r.city.includes(query.trim())) && !excludes.includes(r.name))
+        .filter((r) => (r.name.includes(query.trim()) || r.city.includes(query.trim())) && !excludes.includes(regionKey(r.city, r.name)))
         .slice(0, 10)
     : [];
 
@@ -291,7 +301,7 @@ function RegionAddModal({ excludes, onAdd, onClose }: {
                 <button
                   key={`${r.city}-${r.name}`}
                   type="button"
-                  onClick={() => onAdd(r.name)}
+                  onClick={() => onAdd(regionKey(r.city, r.name))}
                   className="w-full text-left px-3 py-2.5 rounded-[10px] text-[14px] text-[#364153] hover:bg-[#f9fafb] flex items-center justify-between transition-colors tracking-[-0.32px]"
                 >
                   <span className="font-semibold">{r.name}</span>

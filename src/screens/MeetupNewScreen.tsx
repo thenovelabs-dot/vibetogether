@@ -9,6 +9,7 @@ import { useToast } from "../components/Toast";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { RegionPicker } from "../components/RegionPicker";
+import { regionDisplay } from "../lib/regions";
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
@@ -171,7 +172,7 @@ export default function MeetupNewScreen() {
                     form.region ? "text-[#101828]" : "text-[#99a1af]"
                   }`}
                 >
-                  <span className="truncate">{form.region || "지역 선택"}</span>
+                  <span className="truncate">{form.region ? regionDisplay(form.region) : "지역 선택"}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 ml-1 text-[#99a1af]">
                     <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
@@ -418,7 +419,7 @@ function RegionPickerModal({ current, onSelect, onClose }: {
               selected === profileRegion ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f] hover:bg-[#e9eaec]"
             }`}
           >
-            {profileRegion}
+            {regionDisplay(profileRegion)}
           </button>
         </div>
       )}

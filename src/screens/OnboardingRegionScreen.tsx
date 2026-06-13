@@ -3,8 +3,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { getCurrentPosition, reverseGeocode } from "../lib/naverGeo";
 import { createUser } from "../api/users";
+import { regionKey, regionDisplay } from "../lib/regions";
 
-const SEED_REGIONS = ["강남", "서초", "성수", "판교", "홍대", "이태원"];
+const SEED_REGIONS: { label: string; key: string }[] = [
+  { label: "강남",   key: regionKey("서울", "강남구") },
+  { label: "서초",   key: regionKey("서울", "서초구") },
+  { label: "성수",   key: regionKey("서울", "성동구") },
+  { label: "판교",   key: regionKey("경기", "성남시") },
+  { label: "홍대",   key: regionKey("서울", "마포구") },
+  { label: "이태원", key: regionKey("서울", "용산구") },
+];
 
 export default function OnboardingRegionScreen() {
   const navigate = useNavigate();
@@ -67,7 +75,7 @@ export default function OnboardingRegionScreen() {
             className="w-full flex items-center gap-3 px-[14px] py-[14px] rounded-xl border border-[#ae49fd] text-[#ae49fd] font-semibold text-[14px] mb-1 active:bg-[#fbf6ff] disabled:opacity-50 transition-opacity"
           >
             <span>📍</span>
-            {geoLoading ? "위치 불러오는 중..." : "현재 위치로 자동 설정"}
+            {geoLoading ? "위치 불러오는 중..." : selected ? `현재 위치: ${regionDisplay(selected)}` : "현재 위치로 자동 설정"}
           </button>
           {geoError && <p className="mb-3 text-[12px] text-red-500">{geoError}</p>}
           {!geoError && <div className="mb-3" />}
@@ -82,17 +90,17 @@ export default function OnboardingRegionScreen() {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {SEED_REGIONS.map((region) => (
+            {SEED_REGIONS.map(({ label, key }) => (
               <button
-                key={region}
-                onClick={() => setSelected(region)}
+                key={key}
+                onClick={() => setSelected(key)}
                 className={`py-3 rounded-xl text-[14px] font-semibold transition-colors ${
-                  selected === region
+                  selected === key
                     ? "bg-[#f4e5ff] text-[#ae49fd]"
                     : "bg-[#f1f3f7] text-[#898f98] hover:bg-[#e8e8e8]"
                 }`}
               >
-                {region}
+                {label}
               </button>
             ))}
           </div>
