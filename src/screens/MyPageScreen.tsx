@@ -104,8 +104,8 @@ export default function MyPageScreen() {
   }, [session]);
 
   useEffect(() => {
-    if (tab !== "내 신청" || !session) return;
-    setApplicationsLoading(true);
+    if (!session) return;
+    if (tab === "내 신청") setApplicationsLoading(true);
     getMyApplications(session.user.id)
       .then((data) => setMyApplications(
         data.map((d) => ({
@@ -118,7 +118,7 @@ export default function MyPageScreen() {
       ))
       .catch(() => {})
       .finally(() => setApplicationsLoading(false));
-  }, [tab, session]);
+  }, [session]);
 
   async function shareProfile() {
     const url = `${window.location.origin}/user/${encodeURIComponent(profile?.nickname ?? "")}`;
@@ -197,53 +197,21 @@ export default function MyPageScreen() {
 
         {/* 프로필 카드 */}
         {!editing && <div className="bg-white rounded-[16px] p-5 flex flex-col gap-6">
-          <div className="flex items-start gap-4">
-            {profile?.avatar_url && !avatarError ? (
-              <img
-                src={profile.avatar_url}
-                className="w-14 h-14 rounded-full object-cover shrink-0"
-                onError={() => setAvatarError(true)}
-              />
-            ) : (
-              <div className={`w-14 h-14 rounded-full ${avatarColor} flex items-center justify-center text-white text-[22px] font-bold shrink-0`}>
-                {profile?.nickname?.[0] ?? "?"}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-[18px] font-bold text-[#101828] tracking-[-0.32px]">
-                {profile?.nickname || "닉네임 없음"}
-              </p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <div className="flex items-center gap-1">
-                  <img src="/icons/location.svg" width={13} height={13} className="opacity-50 shrink-0" />
-                  <p className="text-[13px] text-[#99a1af] tracking-[-0.32px]">
-                    {profile?.region || "위치 없음"}
-                  </p>
-                </div>
-                {profile?.job_role && (
-                  <>
-                    <span className="text-[#e5e7eb]">·</span>
-                    <span className="text-[13px] text-[#99a1af] tracking-[-0.32px]">
-                      {JOB_LABELS[profile.job_role] ?? profile.job_role}
-                    </span>
-                  </>
-                )}
-              </div>
-              {profile?.ai_tools && profile.ai_tools.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {profile.ai_tools.map((tool) => (
-                    <span
-                      key={tool}
-                      className="px-2 py-0.5 bg-[#f4e5ff] text-[#ae49fd] text-[11px] font-semibold rounded-full tracking-[-0.32px]"
-                    >
-                      {tool}
-                    </span>
-                  ))}
+          <div className="flex flex-col gap-3">
+            {/* 아바타 + 버튼 row */}
+            <div className="flex items-center justify-between">
+              {profile?.avatar_url && !avatarError ? (
+                <img
+                  src={profile.avatar_url}
+                  className="w-14 h-14 rounded-full object-cover shrink-0"
+                  onError={() => setAvatarError(true)}
+                />
+              ) : (
+                <div className={`w-14 h-14 rounded-full ${avatarColor} flex items-center justify-center text-white text-[22px] font-bold shrink-0`}>
+                  {profile?.nickname?.[0] ?? "?"}
                 </div>
               )}
-            </div>
-            {!editing && (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={shareProfile}
                   className="w-9 h-9 flex items-center justify-center rounded-[12px] bg-[#f5f6f7] hover:bg-[#e9eaec] transition-colors"
@@ -278,7 +246,41 @@ export default function MyPageScreen() {
                   </span>
                 </button>
               </div>
-            )}
+            </div>
+            {/* 닉네임 + 정보 */}
+            <div>
+              <p className="text-[18px] font-bold text-[#101828] tracking-[-0.32px]">
+                {profile?.nickname || "닉네임 없음"}
+              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <img src="/icons/location.svg" width={13} height={13} className="opacity-50 shrink-0" />
+                  <p className="text-[13px] text-[#99a1af] tracking-[-0.32px]">
+                    {profile?.region || "위치 없음"}
+                  </p>
+                </div>
+                {profile?.job_role && (
+                  <>
+                    <span className="text-[#e5e7eb]">·</span>
+                    <span className="text-[13px] text-[#99a1af] tracking-[-0.32px]">
+                      {JOB_LABELS[profile.job_role] ?? profile.job_role}
+                    </span>
+                  </>
+                )}
+              </div>
+              {profile?.ai_tools && profile.ai_tools.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {profile.ai_tools.map((tool) => (
+                    <span
+                      key={tool}
+                      className="px-2 py-0.5 bg-[#f4e5ff] text-[#ae49fd] text-[11px] font-semibold rounded-full tracking-[-0.32px]"
+                    >
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="h-px bg-[#f3f4f6]" />

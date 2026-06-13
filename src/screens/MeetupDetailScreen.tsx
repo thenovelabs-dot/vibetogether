@@ -73,13 +73,22 @@ export default function MeetupDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
-    const channel = supabase
+    const commentChannel = supabase
       .channel(`meetup_comments_${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "meetup_comments", filter: `meetup_id=eq.${id}` }, () => {
         getMeetupComments(id).then(setComments).catch(() => {});
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const appChannel = supabase
+      .channel(`meetup_applications_${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "meetup_applications", filter: `meetup_id=eq.${id}` }, () => {
+        getMeetupById(id).then((m) => { if (m) setMeetup(m); }).catch(() => {});
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(commentChannel);
+      supabase.removeChannel(appChannel);
+    };
   }, [id]);
 
   if (loading) return <DetailSkeleton />;

@@ -49,6 +49,7 @@ function BellIcon({ count }: { count: number }) {
 }
 
 const READ_IDS_KEY = "notifications_read_ids";
+const DISMISSED_IDS_KEY = "notifications_dismissed_ids";
 
 function relativeTime(isoStr: string) {
   const diffMin = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
@@ -71,6 +72,19 @@ function saveReadIds(ids: Set<string>) {
   localStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
 }
 
+function loadDismissedIds(): Set<string> {
+  try {
+    const stored = localStorage.getItem(DISMISSED_IDS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedIds(ids: Set<string>) {
+  localStorage.setItem(DISMISSED_IDS_KEY, JSON.stringify([...ids]));
+}
+
 // ── 알림 드롭다운 ──────────────────────────────────────────
 function NotificationBell() {
   const navigate = useNavigate();
@@ -79,10 +93,11 @@ function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(loadDismissedIds);
   const ref = useRef<HTMLDivElement>(null);
 
-  const unreadNotifications = notifications.filter((n) => !readIds.has(n.id));
-  const unreadCount = unreadNotifications.length;
+  const visibleNotifications = notifications.filter((n) => !dismissedIds.has(n.id));
+  const unreadCount = visibleNotifications.filter((n) => !readIds.has(n.id)).length;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -120,10 +135,16 @@ function NotificationBell() {
     setOpen((v) => !v);
   }
 
-  function markAllRead() {
+  function dismissAll() {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      visibleNotifications.forEach((n) => next.add(n.id));
+      saveDismissedIds(next);
+      return next;
+    });
     setReadIds((prev) => {
       const next = new Set(prev);
-      notifications.forEach((n) => next.add(n.id));
+      visibleNotifications.forEach((n) => next.add(n.id));
       saveReadIds(next);
       return next;
     });
@@ -156,12 +177,12 @@ function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-[320px] bg-white border border-[#f3f4f6] rounded-[16px] shadow-[0_4px_20px_rgba(0,0,0,0.08)] z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#f3f4f6]">
             <span className="text-[14px] font-semibold text-[#101828]">알림</span>
-            {unreadCount > 0 && (
+            {visibleNotifications.length > 0 && (
               <button
-                onClick={markAllRead}
-                className="text-[12px] font-semibold text-[#ae49fd] hover:opacity-70"
+                onClick={dismissAll}
+                className="text-[12px] font-semibold text-[#99a1af] hover:text-red-400 transition-colors"
               >
-                모두 읽음
+                전체 삭제
               </button>
             )}
           </div>
@@ -170,23 +191,26 @@ function NotificationBell() {
             <div className="flex justify-center py-8">
               <div className="w-5 h-5 border-2 border-[#ae49fd] border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : unreadNotifications.length === 0 ? (
+          ) : visibleNotifications.length === 0 ? (
             <p className="text-[14px] text-[#99a1af] text-center py-8">알림이 없어요</p>
           ) : (
             <div className="max-h-[320px] overflow-y-auto">
-              {unreadNotifications.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className="w-full px-4 py-3 flex gap-3 items-start border-b border-[#f9fafb] last:border-0 text-left bg-[#fdf9ff] hover:bg-[#f5eeff] transition-colors cursor-pointer"
-                >
-                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[#ae49fd]" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-[#364153] leading-relaxed">{n.message}</p>
-                    <p className="text-[11px] text-[#99a1af] mt-1">{relativeTime(n.time)}</p>
-                  </div>
-                </button>
-              ))}
+              {visibleNotifications.map((n) => {
+                const isRead = readIds.has(n.id);
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`w-full px-4 py-3 flex gap-3 items-start border-b border-[#f9fafb] last:border-0 text-left transition-colors cursor-pointer ${isRead ? "bg-white hover:bg-[#f9fafb]" : "bg-[#fdf9ff] hover:bg-[#f5eeff]"}`}
+                  >
+                    <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${isRead ? "bg-transparent" : "bg-[#ae49fd]"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[13px] leading-relaxed ${isRead ? "text-[#99a1af]" : "text-[#364153]"}`}>{n.message}</p>
+                      <p className="text-[11px] text-[#99a1af] mt-1">{relativeTime(n.time)}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
