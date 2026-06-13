@@ -36,12 +36,12 @@ export default function OnboardingJobScreen() {
     await updateUserJobRole(session.user.id, selected);
     await refreshProfile();
     setSaving(false);
-    navigate("/home", { replace: true });
+    navigate("/meetup", { replace: true });
   }
 
   async function onSkip() {
     await refreshProfile();
-    navigate("/home", { replace: true });
+    navigate("/meetup", { replace: true });
   }
 
   return (

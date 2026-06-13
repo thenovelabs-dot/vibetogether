@@ -63,7 +63,7 @@ export default function AboutScreen() {
             </p>
             <div className="flex gap-3 mt-1">
               <button
-                onClick={() => navigate("/home")}
+                onClick={() => navigate("/meetup")}
                 className="flex items-center gap-2 px-5 py-3 bg-[#101828] text-white text-[14px] font-bold rounded-[14px] hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 모임 둘러보기 →
@@ -186,7 +186,7 @@ export default function AboutScreen() {
             지금 내 근처<br />모각작 모임을 찾아보세요
           </h3>
           <button
-            onClick={() => navigate("/home")}
+            onClick={() => navigate("/meetup")}
             className="mt-1 px-8 py-3.5 bg-[#ae49fd] text-white text-[15px] font-bold rounded-[14px] hover:opacity-90 active:scale-[0.98] transition-all"
           >
             모임 시작하기

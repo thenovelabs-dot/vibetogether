@@ -49,7 +49,7 @@ export default function OnboardingRegionScreen() {
     }
 
     await refreshProfile();
-    navigate("/home", { replace: true });
+    navigate("/meetup", { replace: true });
   }
 
   return (

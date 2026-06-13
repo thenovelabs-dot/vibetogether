@@ -63,8 +63,8 @@ function AppRoutes() {
 
       {/* 공개 라우트 — 로그인 없이 탐색 가능 */}
       <Route element={<Layout />}>
-        <Route path="/feed" element={<FeedScreen />} />
-        <Route path="/home" element={<HomeScreen />} />
+        <Route path="/home" element={<FeedScreen />} />
+        <Route path="/meetup" element={<HomeScreen />} />
         <Route path="/meetup/:id" element={<MeetupDetailScreen />} />
         <Route path="/board" element={<BoardScreen />} />
         <Route path="/board/:id" element={<BoardPostDetailScreen />} />
@@ -91,7 +91,7 @@ function AppRoutes() {
       </Route>
 
       <Route path="/toast-preview" element={<ToastPreviewScreen />} />
-      <Route path="*" element={<Navigate to="/feed" replace />} />
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
 }

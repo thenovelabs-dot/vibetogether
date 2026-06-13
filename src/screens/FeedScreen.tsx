@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMeetups, type Meetup } from "../api/meetups";
 import { getPosts, type BoardPost } from "../api/board";
 import { getShowcases, type ProductItem } from "../api/product";
+import { supabase } from "../lib/supabase";
 import {
   getMyApplicationsWithMeetup,
   getHostPendingItems,
@@ -78,7 +79,7 @@ export default function FeedScreen() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchFeed = useCallback(() => {
     setLoading(true);
     Promise.all([
       getMeetups({ sort: "latest" }),
@@ -93,6 +94,19 @@ export default function FeedScreen() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("feed_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, fetchFeed)
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, fetchFeed)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchFeed]);
 
   useEffect(() => {
     if (!session) return;
@@ -149,7 +163,7 @@ export default function FeedScreen() {
       {/* 메인 피드 */}
       <div className="flex-1 min-w-0 overflow-y-auto pb-6">
         {/* 배너 */}
-        <div className="mb-5 px-4">
+        <div className="mb-5 px-4 pt-6">
           <div className="bg-[#101828] rounded-[20px] md:rounded-[28px] px-5 pt-5 pb-4 md:px-10 md:pt-12 md:pb-7 flex flex-col gap-4 md:gap-[18px]">
             {/* 타이틀 행 */}
             <div className="flex items-end justify-between gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
@@ -259,7 +273,7 @@ export default function FeedScreen() {
 
       {/* 데스크톱 우측 패널 */}
       {session && (
-        <div className="hidden lg:flex flex-col w-[260px] shrink-0 border-l border-[#f3f4f6] overflow-y-auto p-4">
+        <div className="hidden lg:flex flex-col w-[260px] shrink-0 border-l border-[#f3f4f6] overflow-y-auto pt-6 px-4 pb-4">
           <ApplicationStatusPanel
             myApplications={myApplications}
             hostPending={hostPending}

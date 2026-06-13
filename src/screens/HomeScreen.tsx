@@ -1,36 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMeetups, type Meetup } from "../api/meetups";
-import { getPosts, type BoardPost } from "../api/board";
-import { getShowcases, type ProductItem } from "../api/product";
-import {
-  getMyApplicationsWithMeetup,
-  getHostPendingItems,
-  type MyApplicationItem,
-  type HostPendingItem,
-} from "../api/applications";
-import { getMyCoffeeChats, acceptCoffeeChat, type CoffeeChatIncoming, type CoffeeChatOutgoing } from "../api/coffeechat";
-import { UserAvatar } from "../components/UserAvatar";
-import { ApplicationStatusPanel, ApplicationStatusDrawer } from "../components/ApplicationStatusPanel";
 import { useUser } from "../contexts/UserContext";
+import { getMeetups, type Meetup } from "../api/meetups";
+import { ALL_REGIONS } from "../lib/regions";
+import { supabase } from "../lib/supabase";
+import { MeetupCardSkeleton } from "../components/Skeleton";
+import { UserAvatar } from "../components/UserAvatar";
 
-type FeedItem =
-  | { type: "meetup"; data: Meetup; created_at: string }
-  | { type: "board"; data: BoardPost; created_at: string };
-
-const CATEGORY_CHIP: Record<string, string> = {
-  "일반": "bg-[#f1f3f7] text-[#6a7282]",
-  "모각작 후기": "bg-[#eff6ff] text-[#2b7fff]",
-  "바이브코딩 꿀팁": "bg-emerald-50 text-emerald-600",
-  "바이브코딩 질문": "bg-[#f4e5ff] text-[#ae49fd]",
-};
-
-const ICON_GRADIENTS = [
-  "linear-gradient(135deg, #FF2056 0%, #C6005C 100%)",
-  "linear-gradient(135deg, #615FFF 0%, #1447E6 100%)",
-  "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-  "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
-];
+const SORT_OPTIONS = ["최신순", "임박순"] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
 
 function relativeTime(isoStr: string) {
   const diffMin = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
@@ -42,191 +20,172 @@ function relativeTime(isoStr: string) {
 
 export default function HomeScreen() {
   const navigate = useNavigate();
-  const { session } = useUser();
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [showcases, setShowcases] = useState<ProductItem[]>([]);
+  const { profile } = useUser();
+  const [meetups, setMeetups] = useState<Meetup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myApplications, setMyApplications] = useState<MyApplicationItem[]>([]);
-  const [hostPending, setHostPending] = useState<HostPendingItem[]>([]);
-  const [incomingChats, setIncomingChats] = useState<CoffeeChatIncoming[]>([]);
-  const [outgoingChats, setOutgoingChats] = useState<CoffeeChatOutgoing[]>([]);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeSort, setActiveSort] = useState<SortOption>("최신순");
+  const [showSort, setShowSort] = useState(false);
+  const [activeRegion, setActiveRegion] = useState<string>("all");
+  const [extraRegions, setExtraRegions] = useState<string[]>(() => {
+    try { return JSON.parse(sessionStorage.getItem("home_extra_regions") ?? "[]"); }
+    catch { return []; }
+  });
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      getMeetups({ sort: "latest" }),
-      getPosts({ sort: "latest" }),
-      getShowcases({ sort: "latest" }),
-    ]).then(([meetups, posts, products]) => {
-      const combined: FeedItem[] = [
-        ...meetups.map((m) => ({ type: "meetup" as const, data: m, created_at: m.created_at })),
-        ...posts.map((p) => ({ type: "board" as const, data: p, created_at: p.created_at })),
-      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setFeed(combined);
-      setShowcases(products.slice(0, 4));
-    }).finally(() => setLoading(false));
-  }, []);
+    sessionStorage.setItem("home_extra_regions", JSON.stringify(extraRegions));
+  }, [extraRegions]);
 
-  useEffect(() => {
-    if (!session) return;
-    setStatusLoading(true);
-    Promise.all([
-      getMyApplicationsWithMeetup(session.user.id),
-      getHostPendingItems(session.user.id),
-      getMyCoffeeChats(),
-    ])
-      .then(([apps, host, chats]) => {
-        setMyApplications(apps);
-        setHostPending(host);
-        setIncomingChats(chats.incoming);
-        setOutgoingChats(chats.outgoing);
-      })
+  const userRegion = profile?.region ?? "";
+
+  const fetchMeetups = useCallback(() => {
+    setLoading(true);
+    getMeetups({ sort: activeSort === "임박순" ? "imminent" : "latest" })
+      .then(setMeetups)
       .catch(() => {})
-      .finally(() => setStatusLoading(false));
-  }, [session]);
+      .finally(() => setLoading(false));
+  }, [activeSort]);
 
-  async function handleAcceptChat(chatId: string) {
-    const result = await acceptCoffeeChat(chatId);
-    setIncomingChats((prev) =>
-      prev.map((c) =>
-        c.id === chatId ? { ...c, status: "accepted" as const, requester_email: result.requester_email } : c
-      )
-    );
-  }
+  useEffect(() => {
+    fetchMeetups();
+  }, [fetchMeetups]);
 
-  const totalStatusCount = myApplications.length + hostPending.length + incomingChats.length + outgoingChats.length;
+  useEffect(() => {
+    const channel = supabase
+      .channel("meetups_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, fetchMeetups)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchMeetups]);
+
+  const filtered =
+    activeRegion === "all"
+      ? meetups
+      : activeRegion === "mine"
+      ? (userRegion ? meetups.filter((m) => m.region === userRegion) : meetups)
+      : meetups.filter((m) => m.region === activeRegion);
+
+  const activeLabel =
+    activeRegion === "all" ? "전체" : activeRegion === "mine" ? (userRegion || "내 지역") : activeRegion;
 
   return (
-    <div className="flex h-full">
-      {/* 모바일 드로어 */}
-      <ApplicationStatusDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        myApplications={myApplications}
-        hostPending={hostPending}
-        incomingChats={incomingChats}
-        outgoingChats={outgoingChats}
-        onAcceptChat={handleAcceptChat}
-        loading={statusLoading}
-      />
-
-      {/* 메인 피드 */}
-      <div className="flex-1 min-w-0 overflow-y-auto pb-6">
-        {/* 이번주 프로덕트 배너 */}
-        <div className="px-4 pt-6 mb-5">
-          <div className="bg-[#101828] rounded-[20px] md:rounded-[28px] px-5 pt-5 pb-4 md:px-10 md:pt-12 md:pb-7 flex flex-col gap-4 md:gap-[18px]">
-            <div className="flex items-end justify-between gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
-              <div className="flex flex-col gap-1">
-                <p className="text-[12px] font-medium text-white/40 tracking-[0.6px] uppercase">This Week</p>
-                <p className="text-[20px] md:text-[24px] font-bold text-white leading-[1.3] tracking-[-0.32px]">
-                  이번주 업데이트된<br className="md:hidden" /> 프로덕트를 만나보세요
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/showcase")}
-                className="shrink-0 px-4 py-2 rounded-[12px] bg-white/5 hover:bg-white/10 transition-colors text-[14px] font-semibold text-white/50 tracking-[-0.32px] whitespace-nowrap"
-              >
-                전체보기
-              </button>
-            </div>
-            {showcases.length > 0 && (
-              <div className="flex gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
-                {showcases.map((item, i) => (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(`/showcase/${item.id}`)}
-                    className="flex-1 min-w-0 bg-white/5 hover:bg-white/10 rounded-[16px] p-[14px] flex flex-col gap-3 text-left transition-colors"
-                  >
-                    <div
-                      className="w-10 h-10 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center"
-                      style={{ background: item.icon_url ? undefined : ICON_GRADIENTS[i % ICON_GRADIENTS.length] }}
-                    >
-                      {item.icon_url
-                        ? <img src={item.icon_url} alt="" className="w-full h-full object-cover" />
-                        : <span className="text-[16px] font-bold text-white">{item.title[0]}</span>
-                      }
-                    </div>
-                    <p className="text-[14px] font-semibold text-white leading-[19.6px] tracking-[-0.32px] line-clamp-2">{item.title}</p>
-                    <p className="text-[12px] text-white/75 leading-[16.8px] tracking-[-0.32px] line-clamp-2">{item.short_description}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 모바일 모임 현황 배지 버튼 */}
-        {session && totalStatusCount > 0 && (
-          <div className="lg:hidden px-4 mb-4 mx-auto w-full" style={{ maxWidth: "800px" }}>
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="w-full flex items-center justify-between bg-white rounded-[12px] px-4 py-3 hover:bg-[#f9fafb] transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-[#f4e5ff] flex items-center justify-center">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <span className="text-[13px] font-semibold text-[#364153] tracking-[-0.32px]">내 모임 현황</span>
-                <span className="px-1.5 py-0.5 bg-[#ae49fd] text-white text-[10px] font-bold rounded-full leading-none">
-                  {totalStatusCount}
-                </span>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M9 18l6-6-6-6" stroke="#99a1af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* 혼합 피드 */}
-        <div className="px-4 mx-auto w-full" style={{ maxWidth: "800px" }}>
-          {loading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 5 }).map((_, i) => <FeedSkeleton key={i} />)}
-            </div>
-          ) : feed.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <p className="text-[16px] font-semibold text-[#101828] mb-1 tracking-[-0.32px]">아직 게시물이 없어요</p>
-              <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">첫 번째 모임이나 글을 올려보세요</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {feed.map((item) =>
-                item.type === "meetup" ? (
-                  <MeetupCard
-                    key={`meetup-${item.data.id}`}
-                    meetup={item.data}
-                    onClick={() => navigate(`/meetup/${item.data.id}`)}
-                  />
-                ) : (
-                  <BoardCard
-                    key={`board-${item.data.id}`}
-                    post={item.data}
-                    onClick={() => navigate(`/board/${item.data.id}`)}
-                  />
-                )
-              )}
+    <div className="flex flex-col h-full" onClick={() => setShowSort(false)}>
+      {/* 헤더 */}
+      <div className="flex items-center justify-between pt-6 pb-4 shrink-0 px-4">
+        <h1 className="text-[20px] font-bold text-[#101828] tracking-[-0.32px]">주변 모임</h1>
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setShowSort((v) => !v)}
+            className="flex items-center gap-1 bg-white pl-3 pr-2 py-1.5 rounded-[8px] text-[14px] font-semibold text-[#101828] tracking-[-0.32px] hover:bg-[#f9fafb] transition-colors"
+          >
+            {activeSort}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={`transition-transform ${showSort ? "rotate-180" : ""}`}>
+              <path d="M6 9l6 6 6-6" stroke="#101828" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          {showSort && (
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-[10px] shadow-md border border-[#f3f4f6] py-1 z-20 min-w-[80px]">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => { setActiveSort(opt); setShowSort(false); }}
+                  className={`w-full text-left px-4 py-2 text-[14px] font-semibold tracking-[-0.32px] hover:bg-[#f9fafb] transition-colors ${
+                    activeSort === opt ? "text-[#ae49fd]" : "text-[#364153]"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* 데스크톱 우측 패널 — 내 모임 현황 */}
-      {session && (
-        <div className="hidden lg:flex flex-col w-[260px] shrink-0 border-l border-[#f3f4f6] overflow-y-auto p-4">
-          <ApplicationStatusPanel
-            myApplications={myApplications}
-            hostPending={hostPending}
-            incomingChats={incomingChats}
-            outgoingChats={outgoingChats}
-            onAcceptChat={handleAcceptChat}
-            loading={statusLoading}
-          />
-        </div>
+      {/* 지역 칩 */}
+      <div className="flex items-center gap-2 pb-4 overflow-x-auto shrink-0 no-scrollbar px-4">
+        <button
+          onClick={() => setActiveRegion("all")}
+          className={`shrink-0 px-4 py-2 rounded-full text-[14px] font-semibold transition-colors tracking-[-0.32px] ${
+            activeRegion === "all" ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f]"
+          }`}
+        >
+          전체
+        </button>
+        <button
+          onClick={() => setActiveRegion("mine")}
+          className={`shrink-0 px-4 py-2 rounded-full text-[14px] font-semibold transition-colors tracking-[-0.32px] ${
+            activeRegion === "mine" ? "bg-[#101828] text-white" : "bg-[#f3f4f6] text-[#636e7f]"
+          }`}
+        >
+          {userRegion || "내 지역"}
+        </button>
+        {extraRegions.map((r) => (
+          <div
+            key={r}
+            className={`shrink-0 flex items-center gap-1 rounded-full text-[14px] font-semibold transition-colors py-2 tracking-[-0.32px] ${
+              activeRegion === r ? "bg-[#101828] text-white pl-4 pr-2" : "bg-[#f3f4f6] text-[#636e7f] px-4"
+            }`}
+          >
+            <button onClick={() => setActiveRegion(r)}>{r}</button>
+            {activeRegion === r && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExtraRegions((prev) => prev.filter((x) => x !== r)); setActiveRegion("mine"); }}
+                className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+              >
+                <img src="/icons/X.svg" width={10} height={10} className="brightness-0 invert" />
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          onClick={() => setAdding(true)}
+          className="shrink-0 flex items-center gap-1.5 pl-3 pr-4 py-2 rounded-full text-[14px] font-semibold text-[#99a1af] border border-dashed border-[#d1d5dc] hover:border-[#ae49fd] hover:text-[#ae49fd] transition-colors tracking-[-0.32px]"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+          </svg>
+          지역 추가
+        </button>
+      </div>
+
+      {adding && (
+        <RegionAddModal
+          excludes={[userRegion, ...extraRegions]}
+          onAdd={(r) => { setExtraRegions((prev) => [...prev, r]); setActiveRegion(r); setAdding(false); }}
+          onClose={() => setAdding(false)}
+        />
       )}
+
+      {/* 피드 */}
+      <div className="flex-1 overflow-y-auto pb-6 px-4">
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => <MeetupCardSkeleton key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#f4e5ff] flex items-center justify-center mb-4">
+              <img src="/icons/group.svg" width={28} height={28} />
+            </div>
+            <p className="text-[16px] font-semibold text-[#101828] mb-1 tracking-[-0.32px]">
+              아직 {activeLabel} 모임이 없어요
+            </p>
+            <p className="text-[14px] text-[#99a1af] mb-6 tracking-[-0.32px]">첫 번째 모임을 열어보는 건 어때요?</p>
+            <button
+              onClick={() => navigate("/meetup/new")}
+              className="px-5 py-2.5 bg-[#101828] text-white text-[14px] font-semibold rounded-[12px] tracking-[-0.32px]"
+            >
+              모임 등록하기
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filtered.map((meetup) => (
+              <MeetupCard key={meetup.id} meetup={meetup} onClick={() => navigate(`/meetup/${meetup.id}`)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -240,17 +199,16 @@ function MeetupCard({ meetup, onClick }: { meetup: Meetup; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-5 pt-5 pb-3 bg-white rounded-[16px] flex flex-col gap-3 hover:shadow-[0px_4px_10px_rgba(0,0,0,0.08)] transition-all active:opacity-90"
+      className="w-full text-left px-5 pt-5 pb-3 bg-white rounded-[16px] flex flex-col gap-3 hover:shadow-[0px_4px_10px_rgba(0,0,0,0.1)] transition-all active:opacity-90"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-2 flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-[2px] rounded-full text-[12px] font-bold bg-[#e6eaf1] text-[#6a7282] tracking-[-0.32px]">모임</span>
-            {isClosed && (
-              <span className="px-2 py-[2px] bg-[#f3f4f6] text-[#99a1af] text-[11px] font-semibold rounded-full tracking-[-0.32px]">마감</span>
-            )}
-          </div>
-          <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">{meetup.title}</p>
+        <div className="flex-1 flex items-start gap-2 min-w-0">
+          {isClosed && (
+            <span className="shrink-0 mt-0.5 px-2 py-[2px] bg-[#f3f4f6] text-[#99a1af] text-[11px] font-semibold rounded-full tracking-[-0.32px]">마감</span>
+          )}
+          <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">
+            {meetup.title}
+          </p>
         </div>
         <span className="text-[12px] text-[#99a1af] tracking-[-0.32px] shrink-0 mt-0.5">{relativeTime(meetup.created_at)}</span>
       </div>
@@ -288,61 +246,61 @@ function MeetupCard({ meetup, onClick }: { meetup: Meetup; onClick: () => void }
   );
 }
 
-function BoardCard({ post, onClick }: { post: BoardPost; onClick: () => void }) {
-  const chipClass = CATEGORY_CHIP[post.category] ?? "bg-[#f1f3f7] text-[#6a7282]";
-  const preview = post.content.replace(/\n+/g, " ").trim().slice(0, 100);
+function RegionAddModal({ excludes, onAdd, onClose }: {
+  excludes: string[];
+  onAdd: (r: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+
+  const suggestions = query.trim().length >= 1
+    ? ALL_REGIONS
+        .filter((r) => (r.name.includes(query.trim()) || r.city.includes(query.trim())) && !excludes.includes(r.name))
+        .slice(0, 10)
+    : [];
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-5 pt-5 pb-3 bg-white rounded-[16px] flex flex-col gap-3 hover:shadow-[0px_4px_10px_rgba(0,0,0,0.08)] transition-all active:opacity-90"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-2 flex-1 min-w-0">
-          <span className={`self-start px-2 py-[2px] rounded-full text-[12px] font-bold tracking-[-0.32px] ${chipClass}`}>
-            {post.category}
-          </span>
-          <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">{post.title}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-white rounded-[20px] shadow-[0px_4px_20px_rgba(0,0,0,0.1)] w-full max-w-sm p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[16px] font-bold text-[#101828] tracking-[-0.32px]">지역 추가</p>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-[8px] hover:bg-[#f3f4f6] transition-colors">
+            <img src="/icons/X.svg" width={16} height={16} />
+          </button>
         </div>
-        <span className="text-[12px] text-[#99a1af] tracking-[-0.32px] shrink-0 mt-0.5">{relativeTime(post.created_at)}</span>
-      </div>
-      {preview && (
-        <p className="text-[14px] text-[#6a7282] leading-[1.4] tracking-[-0.32px] line-clamp-2">{preview}</p>
-      )}
-      <div className="w-full border-t border-[#f3f4f6] pt-3 flex items-center justify-between">
-        <div className="flex items-center gap-[10px]">
-          <div className="flex items-center gap-[6px]">
-            <img src="/icons/Comment.svg" width={16} height={16} className="opacity-60" />
-            <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.comment_count}</span>
-          </div>
-          <div className="flex items-center gap-[6px]">
-            <img src="/icons/eye.svg" width={16} height={16} className="opacity-60" />
-            <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.view_count}</span>
-          </div>
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+          placeholder="지역명 입력 (예: 해운대구, 제주)"
+          className="input"
+        />
+        <div className="mt-3 min-h-[52px]">
+          {query.trim().length === 0 ? (
+            <p className="text-[14px] text-[#99a1af] text-center py-3 tracking-[-0.32px]">지역명을 입력해주세요</p>
+          ) : suggestions.length === 0 ? (
+            <p className="text-[14px] text-[#99a1af] text-center py-3 tracking-[-0.32px]">검색 결과가 없어요</p>
+          ) : (
+            <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto">
+              {suggestions.map((r) => (
+                <button
+                  key={`${r.city}-${r.name}`}
+                  type="button"
+                  onClick={() => onAdd(r.name)}
+                  className="w-full text-left px-3 py-2.5 rounded-[10px] text-[14px] text-[#364153] hover:bg-[#f9fafb] flex items-center justify-between transition-colors tracking-[-0.32px]"
+                >
+                  <span className="font-semibold">{r.name}</span>
+                  <span className="text-[12px] text-[#99a1af]">{r.city}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <UserAvatar avatarUrl={post.author_avatar_url} nickname={post.author_nickname} className="w-5 h-5 text-[10px]" />
-          <span className="text-[12px] font-semibold text-[#364153] tracking-[-0.32px] whitespace-nowrap">{post.author_nickname}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function FeedSkeleton() {
-  return (
-    <div className="bg-white rounded-[16px] px-5 pt-5 pb-3 flex flex-col gap-3 animate-pulse">
-      <div className="flex gap-2 items-center">
-        <div className="h-5 w-10 bg-[#f3f4f6] rounded-full" />
-        <div className="h-5 w-32 bg-[#f3f4f6] rounded-[6px]" />
-      </div>
-      <div className="flex flex-col gap-2">
-        <div className="h-3 bg-[#f3f4f6] rounded w-3/4" />
-        <div className="h-3 bg-[#f3f4f6] rounded w-1/2" />
-      </div>
-      <div className="border-t border-[#f3f4f6] pt-3 flex justify-between">
-        <div className="h-3 w-16 bg-[#f3f4f6] rounded" />
-        <div className="h-3 w-20 bg-[#f3f4f6] rounded" />
       </div>
     </div>
   );

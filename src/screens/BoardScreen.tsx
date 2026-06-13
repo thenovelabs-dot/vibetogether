@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPosts, type BoardPost } from "../api/board";
 import { BoardPostSkeleton } from "../components/Skeleton";
 import { UserAvatar } from "../components/UserAvatar";
+import { supabase } from "../lib/supabase";
 
 const CATEGORIES = ["전체", "일반", "모각작 후기", "바이브코딩 꿀팁", "바이브코딩 질문"] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -35,7 +36,7 @@ export default function BoardScreen() {
   const [showSort, setShowSort] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category>("전체");
 
-  useEffect(() => {
+  const fetchPosts = useCallback(() => {
     setLoading(true);
     getPosts({
       category: activeCategory !== "전체" ? activeCategory : undefined,
@@ -45,6 +46,18 @@ export default function BoardScreen() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [activeSort, activeCategory]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("board_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, fetchPosts)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchPosts]);
 
   return (
     <div className="flex flex-col h-full" onClick={() => setShowSort(false)}>

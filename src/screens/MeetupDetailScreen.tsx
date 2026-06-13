@@ -131,7 +131,7 @@ export default function MeetupDetailScreen() {
     setDeleting(true);
     try {
       await deleteMeetup(id);
-      navigate("/home", { replace: true });
+      navigate("/meetup", { replace: true });
     } catch {
       toast("삭제에 실패했어요. 다시 시도해주세요");
       setDeleting(false);

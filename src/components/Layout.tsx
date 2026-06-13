@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react"; // useRef/useEffect used in NotificationBell
 import { useUser } from "../contexts/UserContext";
 import { getNotifications, type Notification } from "../api/notifications";
 import { useNavigationGuard } from "../contexts/NavigationGuardContext";
@@ -7,16 +7,18 @@ import { ContactModal } from "./ContactModal";
 import { UserAvatar } from "./UserAvatar";
 
 const MAIN_TABS = [
-  { path: "/feed",    label: "홈",      icon: "/icons/rocket.svg"    },
-  { path: "/home",     label: "모임",    icon: "/icons/group.svg"     },
-  { path: "/board",    label: "게시판",  icon: "/icons/community.svg" },
+  { path: "/home",    label: "홈",      icon: "/icons/rocket.svg"    },
+  { path: "/meetup",  label: "모임",    icon: "/icons/group.svg"     },
+  { path: "/board",   label: "게시판",  icon: "/icons/community.svg" },
   { path: "/product", label: "프로덕트", icon: null },
 ];
 const PROFILE_PATH = "/mypage";
 const ALL_TAB_PATHS = [...MAIN_TABS.map((t) => t.path), PROFILE_PATH];
 
 const NEW_ACTION: Record<string, { label: string; to: string }> = {
-  "/board":    { label: "글쓰기",       to: "/board/new"   },
+  "/home":    { label: "모임 등록하기", to: "/meetup/new"  },
+  "/meetup":  { label: "모임 등록하기", to: "/meetup/new"  },
+  "/board":   { label: "글쓰기",        to: "/board/new"   },
   "/product": { label: "프로젝트 등록", to: "/product/new" },
 };
 
@@ -185,17 +187,11 @@ export default function Layout() {
   const guard = useNavigationGuard();
   const { session, profile } = useUser();
   const { pathname } = useLocation();
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
-  const navRef = useRef<HTMLElement>(null);
 
   function guardNav(path: string) {
     guard.tryNavigate(navigate, path);
   }
-
-  useEffect(() => {
-    if (navRef.current?.matches(":hover")) setSidebarExpanded(true);
-  }, []);
 
   const activeTab = ALL_TAB_PATHS.find((path) => pathname === path || pathname.startsWith(path + "/"));
   const rootPath  = activeTab ?? "/home";
@@ -228,13 +224,8 @@ export default function Layout() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* 왼쪽 사이드바 (desktop) — hover 시 확장 */}
-        <nav
-          className={`hidden lg:flex flex-col shrink-0 border-r border-[#f3f4f6] transition-[width] duration-200 ease-in-out ${sidebarExpanded ? "w-64" : "w-20"}`}
-          ref={navRef}
-          onMouseEnter={() => setSidebarExpanded(true)}
-          onMouseLeave={() => setSidebarExpanded(false)}
-        >
+        {/* 왼쪽 사이드바 (desktop) */}
+        <nav className="hidden lg:flex flex-col shrink-0 border-r border-[#f3f4f6] w-64">
           {/* 상단: 메인 탭 */}
           <div className="flex flex-col gap-1 flex-1 px-4 pt-4">
             {MAIN_TABS.map(({ path, label, icon }) => {
@@ -243,16 +234,16 @@ export default function Layout() {
                 <button
                   key={path}
                   onClick={() => guardNav(path)}
-                  className={`flex items-center w-full py-3 rounded-[12px] transition-colors ${
+                  className={`flex items-center w-full py-3 rounded-[12px] gap-3 px-3 transition-colors ${
                     active ? "bg-[#f3f4f6]" : "hover:bg-[#f9fafb]"
-                  } ${sidebarExpanded ? "gap-3 px-3 justify-start" : "justify-center"}`}
+                  }`}
                 >
                   {icon ? (
                     <img src={icon} width={24} height={24} className={`shrink-0 ${active ? "brightness-0" : "opacity-60"}`} />
                   ) : (
                     <ProductIcon active={active} />
                   )}
-                  <span className={`whitespace-nowrap text-[15px] font-semibold transition-opacity duration-150 ${sidebarExpanded ? "opacity-100" : "opacity-0 hidden"} ${active ? "text-[#101828]" : "text-[#6a7282]"}`}>
+                  <span className={`whitespace-nowrap text-[15px] font-semibold ${active ? "text-[#101828]" : "text-[#6a7282]"}`}>
                     {label}
                   </span>
                 </button>
@@ -260,46 +251,41 @@ export default function Layout() {
             })}
           </div>
 
-          {/* 하단: 보조 링크 + 프로필 탭 + FAB */}
+          {/* 하단: 보조 링크 + FAB + 프로필 */}
           <div className="px-4 pb-6 flex flex-col gap-1">
-            {/* 보조 링크 (expanded 시에만) */}
-            {sidebarExpanded && (
-              <div className="flex flex-col gap-0.5 mb-1">
-                <button
-                  onClick={() => guardNav("/notice")}
-                  className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                    pathname.startsWith("/notice") ? "text-[#ae49fd]" : "text-[#99a1af] hover:text-[#6a7282]"
-                  }`}
-                >
-                  공지사항
-                </button>
-                <button
-                  onClick={() => setInquiryOpen(true)}
-                  className="w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold text-[#99a1af] hover:text-[#6a7282] transition-colors whitespace-nowrap"
-                >
-                  문의하기
-                </button>
-                <button
-                  onClick={() => guardNav("/about")}
-                  className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                    pathname === "/about" ? "text-[#ae49fd]" : "text-[#99a1af] hover:text-[#6a7282]"
-                  }`}
-                >
-                  서비스 소개
-                </button>
-              </div>
-            )}
+            <div className="flex flex-col gap-0.5 mb-1">
+              <button
+                onClick={() => guardNav("/notice")}
+                className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                  pathname.startsWith("/notice") ? "text-[#ae49fd]" : "text-[#99a1af] hover:text-[#6a7282]"
+                }`}
+              >
+                공지사항
+              </button>
+              <button
+                onClick={() => setInquiryOpen(true)}
+                className="w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold text-[#99a1af] hover:text-[#6a7282] transition-colors whitespace-nowrap"
+              >
+                문의하기
+              </button>
+              <button
+                onClick={() => guardNav("/about")}
+                className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                  pathname === "/about" ? "text-[#ae49fd]" : "text-[#99a1af] hover:text-[#6a7282]"
+                }`}
+              >
+                서비스 소개
+              </button>
+            </div>
 
             {/* FAB */}
             {action && (
               <button
                 onClick={() => guardNav(action.to)}
-                className={`flex items-center justify-center h-[48px] w-full bg-[#101828] text-white rounded-[12px] active:opacity-80 transition-all ${sidebarExpanded ? "gap-2 text-[14px] font-semibold" : ""}`}
+                className="flex items-center justify-center gap-2 h-[48px] w-full bg-[#101828] text-white rounded-[12px] text-[14px] font-semibold active:opacity-80 transition-opacity mb-1"
               >
                 <img src="/icons/plus.svg" width={14} height={14} className="shrink-0" />
-                {sidebarExpanded && (
-                  <span className="whitespace-nowrap">{action.label}</span>
-                )}
+                <span className="whitespace-nowrap">{action.label}</span>
               </button>
             )}
 
@@ -310,34 +296,30 @@ export default function Layout() {
                 return (
                   <button
                     onClick={() => guardNav(PROFILE_PATH)}
-                    className={`flex items-center w-full py-3 rounded-[12px] transition-colors ${
+                    className={`flex items-center w-full py-3 rounded-[12px] gap-3 px-3 transition-colors ${
                       active ? "bg-[#f3f4f6]" : "hover:bg-[#f9fafb]"
-                    } ${sidebarExpanded ? "gap-3 px-3 justify-start" : "justify-center"}`}
+                    }`}
                   >
                     {profile ? (
                       <UserAvatar avatarUrl={profile.avatar_url} nickname={profile.nickname} className="w-6 h-6 text-[11px]" />
                     ) : (
                       <img src="/icons/profile.svg" width={24} height={24} className={`shrink-0 ${active ? "brightness-0" : "opacity-60"}`} />
                     )}
-                    {sidebarExpanded && (
-                      <span className={`text-[15px] font-semibold truncate max-w-[150px] ${active ? "text-[#101828]" : "text-[#6a7282]"}`}>
-                        {profile?.nickname ?? "프로필"}
-                      </span>
-                    )}
+                    <span className={`text-[15px] font-semibold truncate max-w-[150px] ${active ? "text-[#101828]" : "text-[#6a7282]"}`}>
+                      {profile?.nickname ?? "프로필"}
+                    </span>
                   </button>
                 );
               })()
             ) : (
               <button
                 onClick={() => navigate("/login")}
-                className={`flex items-center justify-center w-full h-[48px] rounded-[12px] bg-[#101828] hover:bg-[#1f2937] transition-colors ${sidebarExpanded ? "gap-2 px-3" : ""}`}
+                className="flex items-center justify-center gap-2 px-3 w-full h-[48px] rounded-[12px] bg-[#101828] hover:bg-[#1f2937] transition-colors"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="shrink-0">
                   <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {sidebarExpanded && (
-                  <span className="text-[14px] font-semibold text-white whitespace-nowrap">로그인 / 회원가입</span>
-                )}
+                <span className="text-[14px] font-semibold text-white whitespace-nowrap">로그인 / 회원가입</span>
               </button>
             )}
           </div>
@@ -403,8 +385,8 @@ export default function Layout() {
         <main className={`flex-1 overflow-y-auto pb-16 lg:pb-0 ${isFormPage ? "bg-white" : "bg-[#fafbfb]"}`}>
           <div
             key={pathname}
-            className={`animate-page-enter ${["/feed", "/home"].includes(pathname) ? "h-full" : "mx-auto h-full"}`}
-            style={["/feed", "/home"].includes(pathname) ? {} : { maxWidth: "800px" }}
+            className={`animate-page-enter ${pathname === "/home" ? "h-full" : "mx-auto h-full"}`}
+            style={pathname === "/home" ? {} : { maxWidth: "800px" }}
           >
             <Outlet />
           </div>

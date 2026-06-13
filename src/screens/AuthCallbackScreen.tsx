@@ -21,7 +21,7 @@ export default function AuthCallbackScreen() {
       if (profile) {
         const redirect = localStorage.getItem("loginRedirect");
         localStorage.removeItem("loginRedirect");
-        navigate(redirect || "/home", { replace: true });
+        navigate(redirect || "/meetup", { replace: true });
       } else {
         navigate("/onboarding/nickname", { replace: true });
       }
