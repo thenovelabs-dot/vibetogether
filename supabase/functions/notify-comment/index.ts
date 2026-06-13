@@ -1,0 +1,86 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { meetup_id, commenter_id } = await req.json();
+    if (!meetup_id || !commenter_id) {
+      return new Response(JSON.stringify({ error: "meetup_id and commenter_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // 모임 + 호스트 조회
+    const { data: meetup, error: meetupErr } = await admin
+      .from("meetups")
+      .select("title, host_id")
+      .eq("id", meetup_id)
+      .single();
+
+    if (meetupErr || !meetup) {
+      return new Response(JSON.stringify({ error: "Meetup not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 댓글 작성자가 호스트 본인이면 이메일 안 보냄
+    if (meetup.host_id === commenter_id) {
+      return new Response(JSON.stringify({ skipped: "commenter is host" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 호스트 이메일 조회
+    const { data: hostAuth } = await admin.auth.admin.getUserById(meetup.host_id);
+    const hostEmail = hostAuth?.user?.email;
+
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    if (resendKey && hostEmail) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "같이바코할사람 <onboarding@resend.dev>",
+          to: hostEmail,
+          subject: `[같이바코할사람] '${meetup.title}'에 새 댓글이 달렸어요`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+              <h2 style="color: #101828; margin-bottom: 8px;">새 댓글이 달렸어요!</h2>
+              <p style="color: #6a7282; margin-bottom: 24px;">
+                회원님이 등록한 <strong style="color: #101828;">'${meetup.title}'</strong> 모임에 댓글이 달렸어요.
+              </p>
+              <p style="color: #99a1af; font-size: 13px;">
+                앱에서 확인해보세요 🙌
+              </p>
+            </div>
+          `,
+        }),
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

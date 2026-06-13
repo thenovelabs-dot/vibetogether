@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>같이바코할사람</title>
+    <meta name="description" content="바이브코딩하는 사람들이 동네에서 모각작 모임을 열고 참여하는 커뮤니티" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="같이바코할사람" />
+    <meta property="og:description" content="바이브코딩하는 사람들이 동네에서 모각작 모임을 열고 참여하는 커뮤니티" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:url" content="https://vibetogether.co" />
+    <meta property="og:site_name" content="같이바코할사람" />
+    <meta property="og:locale" content="ko_KR" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="같이바코할사람" />
+    <meta name="twitter:description" content="바이브코딩하는 사람들이 동네에서 모각작 모임을 열고 참여하는 커뮤니티" />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+    <script>
+      // Naver Maps SDK는 ncpClientId가 확정된 후 동적으로 로드
+      window.__loadNaverMaps = function(clientId) {
+        return new Promise((resolve, reject) => {
+          if (window.naver?.maps?.Service) { resolve(); return; }
+
+          var timeout = setTimeout(function() {
+            reject(new Error('네이버 지도 SDK 로드 시간 초과 — Client ID 또는 허용 도메인을 확인해주세요'));
+          }, 10000);
+
+          window.__naverMapsReady = function() {
+            clearTimeout(timeout);
+            resolve();
+          };
+
+          var script = document.createElement('script');
+          script.src = 'https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=' + clientId + '&submodules=geocoder&callback=__naverMapsReady';
+          script.onerror = function() {
+            clearTimeout(timeout);
+            reject(new Error('네이버 지도 SDK 로드 실패 — Client ID 또는 허용 도메인을 확인해주세요'));
+          };
+          document.head.appendChild(script);
+        });
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.4;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+#root {
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: none;
+  background: #f9fafb;
+  font-size: 14px;
+  outline: none;
+  transition: background-color 0.15s;
+}
+.input:focus {
+  background: #fbf6ff;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page-enter {
+  animation: page-enter 0.18s ease-out both;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* react-day-picker overrides */
+.rdp-wrapper .rdp-month_caption {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+.rdp-wrapper .rdp-weekday {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9CA3AF;
+  opacity: 1;
+}
+.rdp-wrapper .rdp-day_button {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+.rdp-wrapper .rdp-day_button:hover:not(:disabled) {
+  background-color: #F3F4F6;
+}
+.rdp-wrapper .rdp-selected .rdp-day_button {
+  background-color: #ae49fd;
+  color: white;
+  border-color: #ae49fd;
+}
+.rdp-wrapper .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: #ae49fd;
+  font-weight: 700;
+}
+.rdp-wrapper .rdp-disabled .rdp-day_button {
+  color: #D1D5DB;
+}
+.rdp-wrapper .rdp-chevron {
+  fill: #6B7280;
+}
+.rdp-wrapper .rdp-button_previous,
+.rdp-wrapper .rdp-button_next {
+  border-radius: 8px;
+}
+.rdp-wrapper .rdp-button_previous:hover,
+.rdp-wrapper .rdp-button_next:hover {
+  background-color: #F3F4F6;
+}
