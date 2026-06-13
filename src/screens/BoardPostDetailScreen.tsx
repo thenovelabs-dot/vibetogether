@@ -15,6 +15,21 @@ import { useUser } from "../contexts/UserContext";
 import { useToast } from "../components/Toast";
 import { UserAvatar } from "../components/UserAvatar";
 
+const CATEGORY_CHIP: Record<string, string> = {
+  "일반": "bg-[#f1f3f7] text-[#6a7282]",
+  "모각작 후기": "bg-[#eff6ff] text-[#2b7fff]",
+  "바이브코딩 꿀팁": "bg-emerald-50 text-emerald-600",
+  "바이브코딩 질문": "bg-[#f4e5ff] text-[#ae49fd]",
+};
+
+function relativeTime(isoStr: string) {
+  const diffMin = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}시간 전`;
+  return `${Math.floor(diffMin / 1440)}일 전`;
+}
+
 
 
 export default function BoardPostDetailScreen() {
@@ -72,9 +87,6 @@ export default function BoardPostDetailScreen() {
   }
 
   const is_mine = post.user_id === session?.user.id;
-  const date = new Date(post.created_at);
-  const days = ["일", "월", "화", "수", "목", "금", "토"];
-  const dateStr = `${date.getMonth() + 1}월 ${date.getDate()}일(${days[date.getDay()]})`;
   async function handleCommentSubmit(content: string, parentId?: string | null) {
     if (!session || !id) return;
     await addBoardComment({ postId: id, userId: session.user.id, content, parentId });
@@ -148,26 +160,21 @@ export default function BoardPostDetailScreen() {
       <div className="flex flex-col gap-4 py-6 px-4 flex-1">
 
         {/* 본문 카드 */}
-        <div className="bg-white rounded-[16px] p-3">
-          <div className="flex items-start justify-between px-3 pt-3 pb-3">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <button onClick={() => navigate(`/user/${post.author_nickname}`)} className="shrink-0">
-                <UserAvatar avatarUrl={post.author_avatar_url} nickname={post.author_nickname} className="w-7 h-7 text-[12px]" />
-              </button>
-              <button
-                onClick={() => navigate(`/user/${post.author_nickname}`)}
-                className="text-[14px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors"
-              >
-                {post.author_nickname}
-              </button>
-              <span className="self-start px-2 py-0.5 bg-[rgba(244,246,250,0.8)] text-[#9ba2ad] text-[11px] font-semibold rounded-full tracking-[-0.32px]">
+        <div className="bg-white rounded-[16px] px-5 pt-5 pb-3 flex flex-col gap-3">
+          {/* 카테고리 + 제목 + 시간/액션 */}
+          <div className="flex items-start gap-3">
+            <div className="flex-1 flex flex-col gap-3 min-w-0">
+              <span className={`inline-flex self-start px-2 py-[2px] rounded-full text-[12px] font-medium tracking-[-0.32px] ${CATEGORY_CHIP[post.category] ?? "bg-[#f1f3f7] text-[#6a7282]"}`}>
                 {post.category}
               </span>
-              <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px] ml-auto shrink-0">
-                {dateStr}
-              </span>
+              {post.title && (
+                <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">
+                  {post.title}
+                </p>
+              )}
             </div>
-            <div className="shrink-0 ml-2 flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+              <span className="text-[12px] text-[#99a1af] tracking-[-0.32px]">{relativeTime(post.created_at)}</span>
               <ShareButton />
               <DotsMenu items={is_mine
                 ? [
@@ -181,29 +188,48 @@ export default function BoardPostDetailScreen() {
             </div>
           </div>
 
-          <div className="px-3 pt-2">
-            <p className="text-[15px] leading-[24px] text-[#2a2d33] tracking-[-0.32px] whitespace-pre-line">
-              {post.content}
-            </p>
-            {post.image_urls.length > 0 && (
-              <div className="flex gap-2 flex-wrap mt-4">
-                {post.image_urls.map((url, i) => (
-                  <button key={i} type="button" onClick={() => setLightboxUrl(url)}>
-                    <img
-                      src={url}
-                      alt=""
-                      className="w-24 h-24 object-cover rounded-[12px] hover:opacity-90 transition-opacity"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* 본문 */}
+          <p className="text-[14px] text-[#6a7282] leading-[19.6px] tracking-[-0.32px] whitespace-pre-line">
+            {post.content}
+          </p>
 
-          <div className="border-t border-[#f3f4f6] flex items-center justify-end gap-4 px-4 pt-4 mt-6">
-            <div className="flex items-center gap-1.5">
-              <img src="/icons/eye.svg" width={18} height={18} />
-              <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.view_count}</span>
+          {/* 이미지 */}
+          {post.image_urls.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {post.image_urls.map((url, i) => (
+                <button key={i} type="button" onClick={() => setLightboxUrl(url)}>
+                  <img
+                    src={url}
+                    alt=""
+                    className="w-20 h-20 object-cover rounded-[10px] hover:opacity-90 transition-opacity"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 하단: 댓글+조회수 / 작성자 */}
+          <div className="w-full border-t border-[#f3f4f6] pt-3 flex items-center justify-between">
+            <div className="flex items-center gap-[10px]">
+              <div className="flex items-center gap-[6px]">
+                <img src="/icons/Comment.svg" width={16} height={16} className="opacity-60" />
+                <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.comment_count}</span>
+              </div>
+              <div className="flex items-center gap-[6px]">
+                <img src="/icons/eye.svg" width={16} height={16} className="opacity-60" />
+                <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.view_count}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate(`/user/${post.author_nickname}`)} className="shrink-0">
+                <UserAvatar avatarUrl={post.author_avatar_url} nickname={post.author_nickname} className="w-5 h-5 text-[10px]" />
+              </button>
+              <button
+                onClick={() => navigate(`/user/${post.author_nickname}`)}
+                className="text-[12px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors whitespace-nowrap"
+              >
+                {post.author_nickname}
+              </button>
             </div>
           </div>
         </div>
