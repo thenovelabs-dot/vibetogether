@@ -63,12 +63,19 @@ export default function HomeScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchMeetups]);
 
-  const filtered =
+  const now = new Date();
+  const regionFiltered =
     activeRegion === "all"
       ? meetups
       : activeRegion === "mine"
       ? meetups.filter((m) => m.region === userRegion)
       : meetups.filter((m) => m.region === activeRegion);
+
+  // 모집 중인 모임 먼저, 마감된 모임은 뒤로
+  const filtered = [
+    ...regionFiltered.filter((m) => m.status !== "closed" && new Date(m.start_at) >= now),
+    ...regionFiltered.filter((m) => m.status === "closed" || new Date(m.start_at) < now),
+  ];
 
   const activeLabel =
     activeRegion === "all" ? "전체"

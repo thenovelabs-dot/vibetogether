@@ -140,8 +140,11 @@ export default function FeedScreen() {
     ));
   }
 
+  const now = new Date();
   const feed: FeedItem[] = [
-    ...meetups.map((m) => ({ type: "meetup" as const, data: m })),
+    ...meetups
+      .filter((m) => m.status !== "closed" && new Date(m.start_at) >= now)
+      .map((m) => ({ type: "meetup" as const, data: m })),
     ...posts.map((p) => ({ type: "post" as const, data: p })),
   ].sort(
     (a, b) =>
@@ -185,29 +188,37 @@ export default function FeedScreen() {
             </div>
 
             {/* 프로덕트 카드 */}
-            {products.length > 0 && (
-              <div className="flex gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
-                {products.map((p, idx) => (
-                  <button
-                    key={p.id}
-                    onClick={() => navigate(`/product/${p.id}`)}
-                    className="flex-1 min-w-0 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] rounded-[16px] p-[14px] flex flex-col gap-3 text-left transition-colors"
-                  >
-                    <div
-                      className="w-10 h-10 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center"
-                      style={{ background: p.icon_url ? undefined : PRODUCT_GRADIENTS[idx % PRODUCT_GRADIENTS.length] }}
-                    >
-                      {p.icon_url
-                        ? <img src={p.icon_url} alt="" className="w-full h-full object-cover" />
-                        : <span className="text-[16px] font-bold text-white">{p.title[0]}</span>
-                      }
+            <div className="flex gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
+              {loading || products.length === 0
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex-1 min-w-0 bg-[rgba(255,255,255,0.05)] rounded-[16px] p-[14px] flex flex-col gap-3 animate-pulse">
+                      <div className="w-10 h-10 rounded-[10px] bg-[rgba(255,255,255,0.08)]" />
+                      <div className="h-3 rounded bg-[rgba(255,255,255,0.08)] w-3/4" />
+                      <div className="h-2.5 rounded bg-[rgba(255,255,255,0.06)] w-full" />
+                      <div className="h-2.5 rounded bg-[rgba(255,255,255,0.06)] w-2/3" />
                     </div>
-                    <p className="text-[14px] font-semibold text-white leading-[19.6px] tracking-[-0.32px] line-clamp-2">{p.title}</p>
-                    <p className="text-[12px] text-[rgba(255,255,255,0.75)] leading-[16.8px] tracking-[-0.32px] line-clamp-2">{p.short_description}</p>
-                  </button>
-                ))}
-              </div>
-            )}
+                  ))
+                : products.map((p, idx) => (
+                    <button
+                      key={p.id}
+                      onClick={() => navigate(`/product/${p.id}`)}
+                      className="flex-1 min-w-0 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] rounded-[16px] p-[14px] flex flex-col gap-3 text-left transition-all duration-500 animate-[fadeIn_0.4s_ease-out]"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center"
+                        style={{ background: p.icon_url ? undefined : PRODUCT_GRADIENTS[idx % PRODUCT_GRADIENTS.length] }}
+                      >
+                        {p.icon_url
+                          ? <img src={p.icon_url} alt="" className="w-full h-full object-cover" />
+                          : <span className="text-[16px] font-bold text-white">{p.title[0]}</span>
+                        }
+                      </div>
+                      <p className="text-[14px] font-semibold text-white leading-[19.6px] tracking-[-0.32px] line-clamp-2">{p.title}</p>
+                      <p className="text-[12px] text-[rgba(255,255,255,0.75)] leading-[16.8px] tracking-[-0.32px] line-clamp-2">{p.short_description}</p>
+                    </button>
+                  ))
+              }
+            </div>
           </div>
         </div>
 

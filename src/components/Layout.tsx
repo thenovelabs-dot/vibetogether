@@ -7,7 +7,7 @@ import { ContactModal } from "./ContactModal";
 import { UserAvatar } from "./UserAvatar";
 
 const MAIN_TABS = [
-  { path: "/home",    label: "홈",      icon: "/icons/rocket.svg"    },
+  { path: "/home",    label: "홈",      icon: "/icons/home.svg"      },
   { path: "/meetup",  label: "모임",    icon: "/icons/group.svg"     },
   { path: "/board",   label: "게시판",  icon: "/icons/community.svg" },
   { path: "/product", label: "프로덕트", icon: null },
@@ -430,6 +430,17 @@ export default function Layout() {
           </div>
         </main>
       </div>
+      {/* 모바일 플로팅 등록 버튼 */}
+      {action && !isFormPage && (
+        <button
+          onClick={() => guardNav(action.to)}
+          className="lg:hidden fixed bottom-[76px] right-4 z-40 flex items-center gap-2 h-[48px] px-5 bg-[#101828] text-white rounded-full text-[14px] font-semibold shadow-[0_4px_20px_rgba(0,0,0,0.25)] active:scale-95 transition-transform"
+        >
+          <img src="/icons/plus.svg" width={14} height={14} className="shrink-0" />
+          <span className="whitespace-nowrap">{action.label}</span>
+        </button>
+      )}
+
       {inquiryOpen && (
         <ContactModal
           type="inquiry"
