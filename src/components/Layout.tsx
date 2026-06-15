@@ -306,14 +306,6 @@ export default function Layout() {
               >
                 문의하기
               </button>
-              <button
-                onClick={() => guardNav("/about")}
-                className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  pathname === "/about" ? "text-[#ae49fd]" : "text-[#99a1af] hover:text-[#6a7282]"
-                }`}
-              >
-                서비스 소개
-              </button>
             </div>
 
             {/* FAB */}
@@ -360,6 +352,17 @@ export default function Layout() {
                 <span className="text-[14px] font-semibold text-white whitespace-nowrap">로그인 / 회원가입</span>
               </button>
             )}
+            {/* 푸터 */}
+            <div className="pt-2 border-t border-[#f3f4f6] mt-2">
+              <button
+                onClick={() => guardNav("/about")}
+                className={`w-full text-left px-3 py-1.5 text-[11px] font-medium transition-colors whitespace-nowrap ${
+                  pathname === "/about" ? "text-[#ae49fd]" : "text-[#c4c9d4] hover:text-[#99a1af]"
+                }`}
+              >
+                서비스 소개
+              </button>
+            </div>
           </div>
         </nav>
 
