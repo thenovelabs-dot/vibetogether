@@ -1,19 +1,38 @@
 import { useState } from "react";
-import { useUser } from "../contexts/UserContext";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "../contexts/userContextValue";
+import { useToast } from "../components/toastContext";
+import { features } from "../config/features";
 
 export default function LoginScreen() {
-  const { signInWithGoogle } = useUser();
+  const { signInWithGoogle, signInWithToss } = useUser();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   async function handleSignIn() {
-    setLoading(true);
-    const existing = localStorage.getItem("loginRedirect");
-    if (!existing || existing === "/login") {
-      const params = new URLSearchParams(window.location.search);
-      const from = params.get("from");
-      if (from) localStorage.setItem("loginRedirect", from);
+    if (features.googleLogin) {
+      setLoading(true);
+      const existing = localStorage.getItem("loginRedirect");
+      if (!existing || existing === "/login") {
+        const params = new URLSearchParams(window.location.search);
+        const from = params.get("from");
+        if (from) localStorage.setItem("loginRedirect", from);
+      }
+      await signInWithGoogle();
+      return;
     }
-    await signInWithGoogle();
+    if (features.tossLogin) {
+      setLoading(true);
+      try {
+        await signInWithToss();
+        navigate("/auth/callback", { replace: true });
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "토스 로그인에 실패했어요", "error");
+      } finally {
+        setLoading(false);
+      }
+    }
   }
 
   return (
@@ -23,12 +42,13 @@ export default function LoginScreen() {
         <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl mb-8">💻</div>
         <h1 className="text-[36px] font-bold text-white mb-3">같이바코할사람</h1>
         <p className="text-[18px] text-white/70 leading-relaxed mb-10">
-          동네에서 바이브코딩 모임을<br />열고 참여하는 서비스
+          {features.meetups ? <>동네에서 바이브코딩 모임을<br />열고 참여하는 서비스</> : <>바이브코딩 프로덕트와<br />노하우를 나누는 서비스</>}
         </p>
         <div className="space-y-3">
-          <Feature text="내 동네 기반으로 모임 찾기" />
-          <Feature text="함께하면 더 집중되는 작업 시간" />
-          <Feature text="같은 관심사를 가진 사람들과 교류" />
+          {(features.meetups
+            ? ["내 동네 기반으로 모임 찾기", "함께하면 더 집중되는 작업 시간", "같은 관심사를 가진 사람들과 교류"]
+            : ["바이브코딩 프로덕트 둘러보기", "게시판에서 작업 노하우 공유", "같은 관심사의 메이커 발견"]
+          ).map((text) => <Feature key={text} text={text} />)}
         </div>
       </div>
 
@@ -37,21 +57,31 @@ export default function LoginScreen() {
         <div className="w-full max-w-sm">
           <div className="lg:hidden mb-8 text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">같이바코할사람</h1>
-            <p className="text-gray-400 text-sm">동네에서 바이브코딩 모임 열고 참여하기</p>
+            <p className="text-gray-400 text-sm">{features.meetups ? "동네에서 바이브코딩 모임 열고 참여하기" : "바이브코딩 프로덕트와 노하우 나누기"}</p>
           </div>
           <h2 className="hidden lg:block text-[20px] font-bold text-[#101828] mb-2">시작하기</h2>
-          <p className="hidden lg:block text-[14px] text-[#99a1af] mb-8">Google 계정으로 바로 시작하세요</p>
+          <p className="hidden lg:block text-[14px] text-[#99a1af] mb-8">
+            {features.googleLogin ? "Google 계정으로 바로 시작하세요" : "앱인토스 로그인 연동을 준비 중이에요"}
+          </p>
           <button
             onClick={handleSignIn}
-            disabled={loading}
+            disabled={loading || (!features.googleLogin && !features.tossLogin)}
             className="w-full flex items-center justify-center gap-3 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-60"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-gray-300 border-t-[#ae49fd] rounded-full animate-spin" />
-            ) : (
+            ) : features.googleLogin ? (
               <GoogleIcon />
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-[#ae49fd]" />
             )}
-            {loading ? "Google 로그인 중..." : "Google로 시작하기"}
+            {loading
+              ? "로그인 중..."
+              : features.googleLogin
+                ? "Google로 시작하기"
+                : features.tossLogin
+                  ? "토스로 시작하기"
+                  : "로그인 준비 중"}
           </button>
         </div>
       </div>

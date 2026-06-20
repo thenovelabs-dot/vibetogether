@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { updateUserJobRole } from "../api/users";
+import { features } from "../config/features";
 
 const JOB_ROLES = [
   { id: "developer", label: "개발자" },
@@ -36,12 +37,12 @@ export default function OnboardingJobScreen() {
     await updateUserJobRole(session.user.id, selected);
     await refreshProfile();
     setSaving(false);
-    navigate("/meetup", { replace: true });
+    navigate(features.meetups ? "/meetup" : "/home", { replace: true });
   }
 
   async function onSkip() {
     await refreshProfile();
-    navigate("/meetup", { replace: true });
+    navigate(features.meetups ? "/meetup" : "/home", { replace: true });
   }
 
   return (
@@ -50,12 +51,13 @@ export default function OnboardingJobScreen() {
         <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl mb-8">💻</div>
         <h1 className="text-[36px] font-bold text-white mb-3">같이바코할사람</h1>
         <p className="text-[18px] text-white/70 leading-relaxed mb-10">
-          동네에서 바이브코딩 모임을<br />열고 참여하는 서비스
+          {features.meetups ? <>동네에서 바이브코딩 모임을<br />열고 참여하는 서비스</> : <>바이브코딩 프로덕트와<br />노하우를 나누는 서비스</>}
         </p>
         <div className="space-y-3">
-          <Feature text="내 동네 기반으로 모임 찾기" />
-          <Feature text="함께하면 더 집중되는 작업 시간" />
-          <Feature text="같은 관심사를 가진 사람들과 교류" />
+          {(features.meetups
+            ? ["내 동네 기반으로 모임 찾기", "함께하면 더 집중되는 작업 시간", "같은 관심사를 가진 사람들과 교류"]
+            : ["프로덕트 쇼케이스 둘러보기", "게시판에서 노하우 공유", "같은 관심사의 메이커 발견"]
+          ).map((text) => <Feature key={text} text={text} />)}
         </div>
       </div>
 

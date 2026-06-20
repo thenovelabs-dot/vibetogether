@@ -17,10 +17,23 @@ export interface BoardPost {
 export async function getPosts(params?: {
   category?: string;
   sort?: "latest" | "popular";
+  limit?: number;
 }): Promise<BoardPost[]> {
+  const limit = params?.limit ?? 30;
   let query = supabase
     .from("board_posts")
-    .select("*, author:users!user_id(nickname, avatar_url), comment_count:board_comments(count)");
+    .select(`
+      id,
+      user_id,
+      title,
+      content,
+      category,
+      image_urls,
+      view_count,
+      created_at,
+      author:users!user_id(nickname, avatar_url),
+      comment_count:board_comments(count)
+    `);
 
   if (params?.category && params.category !== "전체") {
     query = query.eq("category", params.category);
@@ -29,7 +42,7 @@ export async function getPosts(params?: {
   query = query.order(
     params?.sort === "popular" ? "view_count" : "created_at",
     { ascending: false },
-  );
+  ).limit(limit);
 
   const { data, error } = await query;
   if (error) throw error;

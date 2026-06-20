@@ -12,6 +12,8 @@ type Category = (typeof CATEGORIES)[number];
 const SORT_OPTIONS = ["최신순", "인기순"] as const;
 type SortOption = (typeof SORT_OPTIONS)[number];
 
+const postsCache = new Map<string, BoardPost[]>();
+
 const CATEGORY_CHIP: Record<Category, string> = {
   "전체": "",
   "일반": "bg-[#f1f3f7] text-[#6a7282]",
@@ -33,20 +35,35 @@ export default function BoardScreen() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<BoardPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeSort, setActiveSort] = useState<SortOption>("최신순");
   const [showSort, setShowSort] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category>("전체");
+  const cacheKey = `${activeCategory}:${activeSort}`;
 
-  const fetchPosts = useCallback(() => {
-    setLoading(true);
+  const fetchPosts = useCallback((showInitialLoading = true) => {
+    const cached = postsCache.get(cacheKey);
+    if (cached) {
+      setPosts(cached);
+      setLoading(false);
+    } else if (showInitialLoading) {
+      setLoading(true);
+    }
+
+    setError(null);
     getPosts({
       category: activeCategory !== "전체" ? activeCategory : undefined,
       sort: activeSort === "인기순" ? "popular" : "latest",
     })
-      .then(setPosts)
-      .catch(() => {})
+      .then((nextPosts) => {
+        postsCache.set(cacheKey, nextPosts);
+        setPosts(nextPosts);
+      })
+      .catch(() => {
+        setError("게시판 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+      })
       .finally(() => setLoading(false));
-  }, [activeSort, activeCategory]);
+  }, [activeSort, activeCategory, cacheKey]);
 
   useEffect(() => {
     fetchPosts();
@@ -57,7 +74,7 @@ export default function BoardScreen() {
       .channel("board_realtime")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, (payload: any) => {
-        if (!isViewCountOnlyUpdate(payload)) fetchPosts();
+        if (!isViewCountOnlyUpdate(payload)) fetchPosts(false);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -116,6 +133,11 @@ export default function BoardScreen() {
         {loading ? (
           <div className="flex flex-col gap-3 pt-1">
             {Array.from({ length: 4 }).map((_, i) => <BoardPostSkeleton key={i} />)}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-[16px] font-semibold text-[#101828] mb-1 tracking-[-0.32px]">연결을 확인해주세요</p>
+            <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">{error}</p>
           </div>
         ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

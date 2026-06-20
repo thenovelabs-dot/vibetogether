@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { getMeetups, type Meetup } from "../api/meetups";
 import { ALL_REGIONS, regionKey, regionDisplay } from "../lib/regions";
 import { isViewCountOnlyUpdate } from "../lib/realtime";

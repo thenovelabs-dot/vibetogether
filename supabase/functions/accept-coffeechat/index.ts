@@ -80,7 +80,6 @@ Deno.serve(async (req) => {
       .select("id, nickname")
       .in("id", [chat.requester_id, chat.recipient_id]);
 
-    const requesterNickname = users?.find((u: { id: string }) => u.id === chat.requester_id)?.nickname ?? "누군가";
     const recipientNickname = users?.find((u: { id: string }) => u.id === chat.recipient_id)?.nickname ?? "누군가";
 
     // 신청자에게 수락 이메일 발송

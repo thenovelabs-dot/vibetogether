@@ -14,8 +14,8 @@ import { ContactModal } from "../components/ContactModal";
 import { LoginPromptModal } from "../components/LoginPromptModal";
 import { DetailSkeleton } from "../components/Skeleton";
 import { useRequireAuth } from "../hooks/useRequireAuth";
-import { useUser } from "../contexts/UserContext";
-import { useToast } from "../components/Toast";
+import { useUser } from "../contexts/userContextValue";
+import { useToast } from "../components/toastContext";
 
 function relativeTime(isoStr: string) {
   const diffMin = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
@@ -149,6 +149,8 @@ export default function MeetupDetailScreen() {
   }
 
 
+  const totalComments = comments.reduce((sum, c) => sum + 1 + c.replies.length, 0);
+
   return (
     <div className="flex flex-col bg-[#fafbfb] min-h-full">
       {!session && <LoginPromptModal />}
@@ -171,7 +173,97 @@ export default function MeetupDetailScreen() {
       )}
       <div className="flex flex-col gap-4 py-6 px-4 flex-1">
 
-        {/* 신청 완료 상태 배너 — InfoCard 위 */}
+        {/* 피드 아이템 카드 */}
+        <div className="flex flex-col gap-3 items-end">
+          {/* 공유 / 더보기 버튼 — 카드 위 */}
+          <div className="flex items-center gap-2">
+            <ShareButton />
+            <DotsMenu items={is_host
+              ? [
+                  { label: "수정하기", onClick: () => navigate(`/meetup/${id}/edit`) },
+                  { label: "삭제하기", onClick: () => setConfirmDelete(true), danger: true },
+                ]
+              : [
+                  { label: "신고하기", onClick: () => setReportOpen(true), danger: true },
+                ]
+            } />
+          </div>
+
+          {/* 본문 카드 */}
+          <div className="bg-white rounded-[16px] flex flex-col gap-3 items-end pb-3 pt-5 px-5 w-full">
+            {/* 제목 + 작성 시간 */}
+            <div className="flex items-start justify-between gap-3 w-full">
+              <h1 className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px] flex-1 min-w-0">
+                {meetup.title}
+              </h1>
+              <span className="text-[12px] text-[#99a1af] tracking-[-0.32px] shrink-0 mt-0.5">
+                {relativeTime(meetup.created_at)}
+              </span>
+            </div>
+
+            {/* 본문 */}
+            <p className="text-[14px] leading-[19.6px] text-[#6a7282] tracking-[-0.32px] whitespace-pre-wrap w-full">
+              {meetup.description}
+            </p>
+
+            {/* 모임 정보 */}
+            <div className="bg-[rgba(244,246,250,0.5)] rounded-[8px] px-6 py-4 w-full">
+              <p className="text-[14px] font-semibold text-[#9ba2ad] tracking-[-0.32px] mb-3">모임 정보</p>
+              <div className="flex flex-col gap-3">
+                {meetup.place_name && (
+                  <div className="flex items-center gap-2">
+                    <img src="/icons/location.svg" width={22} height={22} className="shrink-0 opacity-60" />
+                    <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">{meetup.place_name}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <img src="/icons/calender.svg" width={22} height={22} className="shrink-0 opacity-60" />
+                  <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">{dateStr}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <img src="/icons/group.svg" width={22} height={22} className="shrink-0 opacity-60" />
+                  <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">최대 {meetup.capacity}명</span>
+                  <span className="text-[14px] font-bold text-[#ae49fd] tracking-[-0.32px]">
+                    {meetup.accepted_count}/{meetup.capacity}명 참여중
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 푸터: 댓글/조회수 (좌) + 작성자/지역 (우) */}
+            <div className="border-t border-[#f3f4f6] pt-3 flex items-center justify-between w-full">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-1.5">
+                  <img src="/icons/Comment.svg" width={16} height={16} />
+                  <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{totalComments}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/icons/eye.svg" width={16} height={16} />
+                  <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{meetup.view_count}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <UserAvatar avatarUrl={meetup.host_avatar_url} nickname={meetup.host_nickname} className="w-5 h-5 text-[10px]" />
+                  <button
+                    onClick={() => navigate(`/user/${meetup.host_nickname}`)}
+                    className="text-[12px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors"
+                  >
+                    {meetup.host_nickname}
+                  </button>
+                </div>
+                <span className="text-[12px] text-[#99a1af] tracking-[-0.32px]">{meetup.region}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 신청 상태 배너 (accepted) */}
+        {!is_host && myStatus === "accepted" && (
+          <AcceptedBanner hostEmail={hostEmail} />
+        )}
+
+        {/* 신청 상태 배너 (pending) */}
         {!is_host && myStatus === "pending" && (
           <div className="bg-[#f1f3f7] rounded-[16px] px-5 py-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-[#e4e7ed] flex items-center justify-center shrink-0">
@@ -183,105 +275,8 @@ export default function MeetupDetailScreen() {
             </div>
           </div>
         )}
-        {!is_host && myStatus === "accepted" && (
-          <div className="bg-[#f4e5ff] rounded-[16px] px-5 py-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#ae49fd] flex items-center justify-center shrink-0 mt-0.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <p className="text-[14px] font-semibold text-[#ae49fd] tracking-[-0.32px]">신청 수락됨</p>
-              {hostEmail ? (
-                <>
-                  <p className="text-[12px] text-[#9b6dc7] mt-1 tracking-[-0.32px]">호스트 연락처</p>
-                  <p className="text-[14px] font-semibold text-[#101828] mt-0.5 tracking-[-0.32px] break-all">{hostEmail}</p>
-                </>
-              ) : (
-                <p className="text-[13px] text-[#6a7282] mt-0.5 tracking-[-0.32px]">이메일로 호스트 연락처를 확인하세요</p>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* InfoCard */}
-        <div className="bg-white rounded-[16px] p-3">
-          <div className="flex items-start justify-between px-3 pt-3 pb-5">
-            <div className="flex flex-col gap-3 flex-1 min-w-0 pr-3">
-              <h1 className="text-[20px] font-bold text-[#101828] leading-[28px] tracking-[-0.32px]">
-                {meetup.title}
-              </h1>
-              <div className="flex items-center gap-2">
-                <UserAvatar avatarUrl={meetup.host_avatar_url} nickname={meetup.host_nickname} className="w-6 h-6 text-[12px]" />
-                <button
-                  onClick={() => navigate(`/user/${meetup.host_nickname}`)}
-                  className="text-[14px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors"
-                >
-                  {meetup.host_nickname}
-                </button>
-                <span className="w-[3px] h-[3px] rounded-full bg-[#99a1af] shrink-0" />
-                <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px]">
-                  {meetup.region}
-                </span>
-                <span className="w-[3px] h-[3px] rounded-full bg-[#99a1af] shrink-0" />
-                <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px]">
-                  {relativeTime(meetup.created_at)}
-                </span>
-              </div>
-            </div>
-            <div className="shrink-0 mt-1 flex items-center gap-1">
-              <ShareButton />
-              <DotsMenu items={is_host
-                ? [
-                    { label: "수정하기", onClick: () => navigate(`/meetup/${id}/edit`) },
-                    { label: "삭제하기", onClick: () => setConfirmDelete(true), danger: true },
-                  ]
-                : [
-                    { label: "신고하기", onClick: () => setReportOpen(true), danger: true },
-                  ]
-              } />
-            </div>
-          </div>
-
-          <div className="px-3">
-            <p className="text-[14px] leading-[19.6px] text-[#2a2d33] tracking-[-0.32px] whitespace-pre-wrap">
-              {meetup.description}
-            </p>
-          </div>
-
-          <div className="bg-[rgba(244,246,250,0.5)] rounded-[8px] px-6 py-4 mt-6">
-            <p className="text-[14px] font-semibold text-[#9ba2ad] tracking-[-0.32px] mb-3">
-              모임 정보
-            </p>
-            <div className="flex flex-col gap-3">
-              {meetup.place_name && (
-                <div className="flex items-center gap-2">
-                  <img src="/icons/location.svg" width={22} height={22} className="shrink-0 opacity-60" />
-                  <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">{meetup.place_name}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <img src="/icons/calender.svg" width={22} height={22} className="shrink-0 opacity-60" />
-                <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">{dateStr}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <img src="/icons/group.svg" width={22} height={22} className="shrink-0 opacity-60" />
-                <span className="text-[14px] text-[#2a2d33] tracking-[-0.32px]">
-                  {meetup.accepted_count}/{meetup.capacity}명 참여중
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-[#f3f4f6] flex items-center justify-end gap-4 px-4 pt-4 mt-4">
-            <div className="flex items-center gap-1.5">
-              <img src="/icons/eye.svg" width={18} height={18} />
-              <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{meetup.view_count}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 신청 버튼 영역 — InfoCard 아래 */}
+        {/* 신청 버튼 */}
         {is_host ? (
           <button
             onClick={() => navigate(`/meetup/${id}/applications`)}
@@ -295,7 +290,6 @@ export default function MeetupDetailScreen() {
             isFull={isFull}
             loading={applyLoading}
             onApply={handleApply}
-            hostEmail={hostEmail}
           />
         )}
 
@@ -304,6 +298,8 @@ export default function MeetupDetailScreen() {
           onSubmit={handleCommentSubmit}
           onDelete={handleCommentDelete}
           currentUserId={session?.user.id}
+          authorId={meetup.host_id}
+          authorBadgeLabel="호스트"
         />
 
       </div>
@@ -317,28 +313,13 @@ function ApplySection({
   isFull,
   loading,
   onApply,
-  hostEmail,
 }: {
   status: ApplicationStatus | null;
   isFull: boolean;
   loading: boolean;
   onApply: () => void;
-  hostEmail: string | null;
 }) {
-  if (status === "accepted") return null;
-
-  // pending 상태: 비활성화 버튼
-  if (status === "pending") {
-    return (
-      <button
-        disabled
-        className="w-full flex items-center justify-center gap-2 py-[14px] bg-[#f3f4f6] text-[#99a1af] text-[14px] font-bold rounded-[12px] cursor-not-allowed tracking-[-0.32px]"
-      >
-        <img src="/icons/clock.svg" width={16} height={16} className="opacity-50" />
-        신청완료
-      </button>
-    );
-  }
+  if (status === "accepted" || status === "pending") return null;
 
   return (
     <button
@@ -351,5 +332,55 @@ function ApplySection({
       )}
       {loading ? "신청 중..." : isFull ? "마감" : "신청하기"}
     </button>
+  );
+}
+
+// ── 수락됨 배너 ──────────────────────────────────────────────
+function AcceptedBanner({ hostEmail }: { hostEmail: string | null }) {
+  const { toast } = useToast();
+
+  async function handleCopy() {
+    if (!hostEmail) return;
+    try {
+      await navigator.clipboard.writeText(hostEmail);
+      toast("이메일 복사됐어요", "info");
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = hostEmail;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast("이메일 복사됐어요", "info");
+    }
+  }
+
+  return (
+    <div className="bg-[#f4e5ff] rounded-[12px] px-4 py-3 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-full bg-[#ae49fd] flex items-center justify-center shrink-0">
+          <svg width="11" height="10" viewBox="0 0 24 24" fill="none">
+            <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <p className="text-[14px] font-bold text-[#ae49fd] tracking-[-0.32px]">신청 수락됨</p>
+      </div>
+      {hostEmail ? (
+        <div className="flex items-center gap-2">
+          <p className="text-[14px] font-semibold text-black tracking-[-0.32px]">{hostEmail}</p>
+          <button
+            onClick={handleCopy}
+            className="shrink-0 opacity-50 hover:opacity-80 transition-opacity"
+            title="이메일 복사"
+          >
+            <img src="/icons/copy_purple.svg" width={16} height={16} />
+          </button>
+        </div>
+      ) : (
+        <p className="text-[13px] text-[#6a7282] tracking-[-0.32px]">이메일로 호스트 연락처를 확인하세요</p>
+      )}
+    </div>
   );
 }

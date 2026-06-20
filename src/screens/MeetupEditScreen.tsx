@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getMeetupById, updateMeetup } from "../api/meetups";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
 

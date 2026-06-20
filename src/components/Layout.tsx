@@ -1,10 +1,11 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { getNotifications, type Notification } from "../api/notifications";
-import { useNavigationGuard } from "../contexts/NavigationGuardContext";
+import { useNavigationGuard } from "../contexts/navigationGuard";
 import { ContactModal } from "./ContactModal";
 import { UserAvatar } from "./UserAvatar";
+import { features } from "../config/features";
 
 const MAIN_TABS = [
   { path: "/home",    label: "홈",      icon: "/icons/home.svg"      },
@@ -12,11 +13,12 @@ const MAIN_TABS = [
   { path: "/board",   label: "게시판",  icon: "/icons/community.svg" },
   { path: "/product", label: "프로덕트", icon: null },
 ];
+const ENABLED_MAIN_TABS = MAIN_TABS.filter((tab) => features.meetups || tab.path !== "/meetup");
 const PROFILE_PATH = "/mypage";
-const ALL_TAB_PATHS = [...MAIN_TABS.map((t) => t.path), PROFILE_PATH];
+const ALL_TAB_PATHS = [...ENABLED_MAIN_TABS.map((t) => t.path), PROFILE_PATH];
 
 const NEW_ACTION: Record<string, { label: string; to: string }> = {
-  "/meetup":  { label: "모임 등록하기", to: "/meetup/new"  },
+  ...(features.meetups ? { "/meetup": { label: "모임 등록하기", to: "/meetup/new" } } : {}),
   "/board":   { label: "글쓰기",        to: "/board/new"   },
   "/product": { label: "프로젝트 등록", to: "/product/new" },
 };
@@ -109,7 +111,10 @@ function NotificationBell() {
 
   const fetchNotifications = useCallback(() => {
     if (!session) return;
-    getNotifications(session.user.id)
+    getNotifications(session.user.id, {
+      includeMeetups: features.meetups,
+      includeCoffeechat: features.coffeechat,
+    })
       .then(setNotifications)
       .catch(() => {});
   }, [session]);
@@ -125,7 +130,10 @@ function NotificationBell() {
   useEffect(() => {
     if (!open || !session) return;
     setLoading(true);
-    getNotifications(session.user.id)
+    getNotifications(session.user.id, {
+      includeMeetups: features.meetups,
+      includeCoffeechat: features.coffeechat,
+    })
       .then(setNotifications)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -158,7 +166,7 @@ function NotificationBell() {
       return next;
     });
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link) navigate(!features.meetups && n.link.startsWith("/meetup") ? "/home" : n.link);
   }
 
   if (!session) return null;
@@ -228,6 +236,10 @@ export default function Layout() {
   const [inquiryOpen, setInquiryOpen] = useState(false);
 
   function guardNav(path: string) {
+    if (!features.meetups && path.startsWith("/meetup")) {
+      guard.tryNavigate(navigate, "/home");
+      return;
+    }
     guard.tryNavigate(navigate, path);
   }
 
@@ -257,6 +269,17 @@ export default function Layout() {
               <path d="M21 21l-4.35-4.35" stroke="#6a7282" strokeWidth="1.8" strokeLinecap="round"/>
             </svg>
           </button>
+          {!session && (
+            <button
+              onClick={() => navigate("/login")}
+              className="flex items-center gap-1.5 ml-1 px-3 py-2 rounded-[10px] bg-[#101828] hover:bg-[#1f2937] transition-colors"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-[13px] font-semibold text-white whitespace-nowrap">로그인</span>
+            </button>
+          )}
           <NotificationBell />
         </div>
       </header>
@@ -266,7 +289,7 @@ export default function Layout() {
         <nav className="hidden lg:flex flex-col shrink-0 border-r border-[#f3f4f6] w-64">
           {/* 상단: 메인 탭 */}
           <div className="flex flex-col gap-1 flex-1 px-4 pt-4">
-            {MAIN_TABS.map(({ path, label, icon }) => {
+            {ENABLED_MAIN_TABS.map(({ path, label, icon }) => {
               const active = activeTab === path;
               return (
                 <button
@@ -341,17 +364,7 @@ export default function Layout() {
                   </button>
                 );
               })()
-            ) : (
-              <button
-                onClick={() => navigate("/login")}
-                className="flex items-center justify-center gap-2 px-3 w-full h-[48px] rounded-[12px] bg-[#101828] hover:bg-[#1f2937] transition-colors"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                  <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-[14px] font-semibold text-white whitespace-nowrap">로그인 / 회원가입</span>
-              </button>
-            )}
+            ) : null}
             {/* 푸터 */}
             <div className="pt-2 border-t border-[#f3f4f6] mt-2">
               <button
@@ -368,7 +381,7 @@ export default function Layout() {
 
         {/* 모바일 하단 탭바 */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#f3f4f6] flex z-50">
-          {MAIN_TABS.map(({ path, label, icon }) => {
+          {ENABLED_MAIN_TABS.map(({ path, label, icon }) => {
             const active = activeTab === path;
             return (
               <button
@@ -407,19 +420,7 @@ export default function Layout() {
                 </button>
               );
             })()
-          ) : (
-            <button
-              onClick={() => navigate("/login")}
-              className="flex-1 flex flex-col items-center gap-1 py-2 px-3"
-            >
-              <div className="flex items-center gap-1.5 bg-[#101828] rounded-[10px] px-3 py-2">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                  <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-[11px] font-semibold text-white whitespace-nowrap">로그인</span>
-              </div>
-            </button>
-          )}
+          ) : null}
         </nav>
 
         {/* 콘텐츠 */}

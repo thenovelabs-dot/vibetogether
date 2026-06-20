@@ -64,7 +64,43 @@ function buildOrFilter(keywords: string[], ...columns: string[]): string {
     .join(",");
 }
 
-export async function searchAll(keyword: string): Promise<{
+type JoinedUser = { nickname: string } | { nickname: string }[] | null;
+
+type RawMeetupSearch = {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  host: JoinedUser;
+};
+
+type RawPostSearch = {
+  id: string;
+  title: string;
+  content: string | null;
+  category: string;
+  created_at: string;
+  author: JoinedUser;
+};
+
+type RawProductSearch = {
+  id: string;
+  title: string;
+  short_description: string | null;
+  service_category: string | null;
+  icon_url: string | null;
+  like_count: number | null;
+  save_count: number | null;
+  created_at: string;
+  author: JoinedUser;
+};
+
+function nicknameFromJoin(user: JoinedUser): string {
+  if (!user) return "";
+  return Array.isArray(user) ? user[0]?.nickname ?? "" : user.nickname;
+}
+
+export async function searchAll(keyword: string, options?: { includeMeetups?: boolean }): Promise<{
   meetups: SearchResult[];
   posts: SearchResult[];
   products: SearchResult[];
@@ -72,14 +108,17 @@ export async function searchAll(keyword: string): Promise<{
   if (!keyword.trim()) return { meetups: [], posts: [], products: [] };
 
   const keywords = expandKeywords(keyword);
+  const includeMeetups = options?.includeMeetups ?? true;
 
   const [meetupsRes, postsRes, productsRes] = await Promise.all([
-    supabase
-      .from("meetups")
-      .select("id, title, description, created_at, host:users!host_id(nickname)")
-      .or(buildOrFilter(keywords, "title", "description"))
-      .order("created_at", { ascending: false })
-      .limit(10),
+    includeMeetups
+      ? supabase
+        .from("meetups")
+        .select("id, title, description, created_at, host:users!host_id(nickname)")
+        .or(buildOrFilter(keywords, "title", "description"))
+        .order("created_at", { ascending: false })
+        .limit(10)
+      : Promise.resolve({ data: [] as RawMeetupSearch[] }),
     supabase
       .from("board_posts")
       .select("id, title, content, category, created_at, author:users!user_id(nickname)")
@@ -94,26 +133,25 @@ export async function searchAll(keyword: string): Promise<{
       .limit(10),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return {
-    meetups: (meetupsRes.data ?? []).map((r: any) => ({
+    meetups: ((meetupsRes.data ?? []) as RawMeetupSearch[]).map((r) => ({
       type: "meetup" as const,
       id: r.id,
       title: r.title,
       description: r.description ?? "",
       created_at: r.created_at,
-      author_nickname: r.host?.nickname ?? "",
+      author_nickname: nicknameFromJoin(r.host),
     })),
-    posts: (postsRes.data ?? []).map((r: any) => ({
+    posts: ((postsRes.data ?? []) as RawPostSearch[]).map((r) => ({
       type: "board" as const,
       id: r.id,
       title: r.title,
       description: r.content ?? "",
       created_at: r.created_at,
-      author_nickname: r.author?.nickname ?? "",
+      author_nickname: nicknameFromJoin(r.author),
       category: r.category,
     })),
-    products: (productsRes.data ?? []).map((r: any) => ({
+    products: ((productsRes.data ?? []) as RawProductSearch[]).map((r) => ({
       type: "product" as const,
       id: r.id,
       title: r.title,
@@ -124,7 +162,7 @@ export async function searchAll(keyword: string): Promise<{
       like_count: r.like_count ?? 0,
       save_count: r.save_count ?? 0,
       created_at: r.created_at,
-      author_nickname: r.author?.nickname ?? "",
+      author_nickname: nicknameFromJoin(r.author),
     })),
   };
 }

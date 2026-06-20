@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getShowcaseById, updateShowcase } from "../api/product";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { supabase } from "../lib/supabase";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { SERVICE_CATEGORIES, AI_TOOLS_OPTIONS, ALL_TECH_TAGS } from "./ProductScreen";
 import type { ServiceCategory } from "./ProductScreen";
 import { PRODUCT_TYPES } from "../api/product";
 import type { ProductType } from "../api/product";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
-
-type TechTag = (typeof ALL_TECH_TAGS)[number];
 
 function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (

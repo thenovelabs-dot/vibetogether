@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { features } from "../config/features";
 
 const FEATURE_CARDS = [
   { emoji: "🗺️", title: "동네 모각작 모임", desc: "내 근처에서 바이브코더들을 만나요" },
@@ -37,6 +38,23 @@ const FOR_WHO = [
 
 export default function AboutScreen() {
   const navigate = useNavigate();
+  const featureCards = features.meetups ? FEATURE_CARDS : [
+    { emoji: "💬", title: "바이브코딩 게시판", desc: "꿀팁과 후기를 나눠요" },
+    { emoji: "🚀", title: "프로덕트 쇼케이스", desc: "만든 서비스를 소개해요" },
+    { emoji: "🔎", title: "검색과 발견", desc: "게시글과 프로덕트를 빠르게 찾아요" },
+    { emoji: "🛡️", title: "신고와 문의", desc: "부적절한 콘텐츠를 바로 알릴 수 있어요" },
+  ];
+  const steps = features.meetups ? STEPS : [
+    { n: "01", title: "게시판에서 함께 성장", desc: "AI 코딩 도구 사용기, 프롬프트 팁, 막히는 부분을 공유해요.", icon: "💬" },
+    { n: "02", title: "완성작을 쇼케이스에", desc: "배포한 서비스와 프로젝트를 소개하고 피드백을 받아요.", icon: "🚀" },
+    { n: "03", title: "좋은 프로덕트를 발견", desc: "다른 메이커가 만든 결과물을 살펴보고 저장해요.", icon: "🔎" },
+  ];
+  const forWho = features.meetups ? FOR_WHO : [
+    { emoji: "🤖", text: "Claude·Cursor로 사이드 프로젝트를 만들고 있는 분" },
+    { emoji: "🌱", text: "완성한 프로덕트를 공유하고 피드백 받고 싶은 분" },
+    { emoji: "💬", text: "AI 코딩 팁과 작업 과정을 나누고 싶은 분" },
+    { emoji: "🚀", text: "다른 메이커의 결과물을 발견하고 싶은 분" },
+  ];
 
   return (
     <div className="flex flex-col bg-[#fafbfb] min-h-full">
@@ -59,14 +77,14 @@ export default function AboutScreen() {
               혼자 코딩하기<br />지치셨나요?
             </h1>
             <p className="text-[15px] text-[#6a7282] leading-relaxed tracking-[-0.32px] max-w-[340px]">
-              바이브코더들이 동네 카페에 모여 각자 프로젝트를 만드는 모각작 커뮤니티예요.
+              {features.meetups ? "바이브코더들이 동네 카페에 모여 각자 프로젝트를 만드는 모각작 커뮤니티예요." : "바이브코더들이 만든 프로덕트와 작업 노하우를 나누는 커뮤니티예요."}
             </p>
             <div className="flex gap-3 mt-1">
               <button
-                onClick={() => navigate("/meetup")}
+                onClick={() => navigate(features.meetups ? "/meetup" : "/product")}
                 className="flex items-center gap-2 px-5 py-3 bg-[#101828] text-white text-[14px] font-bold rounded-[14px] hover:opacity-90 active:scale-[0.98] transition-all"
               >
-                모임 둘러보기 →
+                {features.meetups ? "모임 둘러보기 →" : "프로덕트 보기 →"}
               </button>
               <button
                 onClick={() => navigate("/product")}
@@ -81,30 +99,30 @@ export default function AboutScreen() {
           <div className="relative flex-shrink-0 w-full lg:w-[300px] h-[280px] lg:h-[320px]">
             {/* 카드 1 - 왼쪽 상단 */}
             <FeatureCard
-              emoji={FEATURE_CARDS[0].emoji}
-              title={FEATURE_CARDS[0].title}
-              desc={FEATURE_CARDS[0].desc}
+              emoji={featureCards[0].emoji}
+              title={featureCards[0].title}
+              desc={featureCards[0].desc}
               className="absolute top-0 left-0 w-[170px]"
             />
             {/* 카드 2 - 오른쪽 상단, 살짝 아래 */}
             <FeatureCard
-              emoji={FEATURE_CARDS[1].emoji}
-              title={FEATURE_CARDS[1].title}
-              desc={FEATURE_CARDS[1].desc}
+              emoji={featureCards[1].emoji}
+              title={featureCards[1].title}
+              desc={featureCards[1].desc}
               className="absolute top-[40px] right-0 w-[155px]"
             />
             {/* 카드 3 - 왼쪽 하단, 살짝 아래 */}
             <FeatureCard
-              emoji={FEATURE_CARDS[2].emoji}
-              title={FEATURE_CARDS[2].title}
-              desc={FEATURE_CARDS[2].desc}
+              emoji={featureCards[2].emoji}
+              title={featureCards[2].title}
+              desc={featureCards[2].desc}
               className="absolute bottom-[20px] left-[20px] w-[160px]"
             />
             {/* 카드 4 - 오른쪽 하단 */}
             <FeatureCard
-              emoji={FEATURE_CARDS[3].emoji}
-              title={FEATURE_CARDS[3].title}
-              desc={FEATURE_CARDS[3].desc}
+              emoji={featureCards[3].emoji}
+              title={featureCards[3].title}
+              desc={featureCards[3].desc}
               className="absolute bottom-0 right-0 w-[150px]"
             />
           </div>
@@ -152,7 +170,7 @@ export default function AboutScreen() {
       <section className="px-6 lg:px-10 pb-10">
         <p className="text-[13px] font-bold text-[#ae49fd] tracking-widest mb-5">FOR WHO</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {FOR_WHO.map((item) => (
+          {forWho.map((item) => (
             <div key={item.text} className="bg-white rounded-[16px] px-5 py-4 flex items-center gap-3">
               <span className="text-[24px] flex-shrink-0">{item.emoji}</span>
               <p className="text-[13px] text-[#364153] leading-snug tracking-[-0.32px]">{item.text}</p>
@@ -165,7 +183,7 @@ export default function AboutScreen() {
       <section className="px-6 lg:px-10 pb-10">
         <p className="text-[13px] font-bold text-[#ae49fd] tracking-widest mb-5">HOW IT WORKS</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {STEPS.map((s) => (
+          {steps.map((s) => (
             <div key={s.n} className="bg-white rounded-[18px] p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-bold text-[#ae49fd] tracking-wide">{s.n}</span>
@@ -183,13 +201,13 @@ export default function AboutScreen() {
         <div className="bg-[#101828] rounded-[24px] p-7 flex flex-col items-center text-center gap-4">
           <div className="text-4xl">☕</div>
           <h3 className="text-[20px] font-bold text-white leading-snug tracking-[-0.5px]">
-            지금 내 근처<br />모각작 모임을 찾아보세요
+            {features.meetups ? <>지금 내 근처<br />모각작 모임을 찾아보세요</> : <>바이브코딩으로 만든<br />프로덕트를 둘러보세요</>}
           </h3>
           <button
-            onClick={() => navigate("/meetup")}
+            onClick={() => navigate(features.meetups ? "/meetup" : "/product")}
             className="mt-1 px-8 py-3.5 bg-[#ae49fd] text-white text-[15px] font-bold rounded-[14px] hover:opacity-90 active:scale-[0.98] transition-all"
           >
-            모임 시작하기
+            {features.meetups ? "모임 시작하기" : "프로덕트 둘러보기"}
           </button>
         </div>
       </section>
@@ -200,7 +218,9 @@ export default function AboutScreen() {
         <div className="flex items-center gap-4">
           <a href="/about" className="text-[12px] text-[#99a1af] hover:text-[#364153] transition-colors">서비스 소개</a>
           <span className="text-[#e5e7eb]">·</span>
-          <a href="#" className="text-[12px] text-[#99a1af] hover:text-[#364153] transition-colors">개인정보처리방침</a>
+          <a href="/privacy" className="text-[12px] text-[#99a1af] hover:text-[#364153] transition-colors">개인정보처리방침</a>
+          <span className="text-[#e5e7eb]">·</span>
+          <a href="/terms" className="text-[12px] text-[#99a1af] hover:text-[#364153] transition-colors">이용약관</a>
           <span className="text-[#e5e7eb]">·</span>
           <a href="mailto:thenovelabs@gmail.com" className="text-[12px] text-[#99a1af] hover:text-[#364153] transition-colors">문의하기</a>
         </div>

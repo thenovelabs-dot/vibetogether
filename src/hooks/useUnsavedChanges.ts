@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useNavigationGuard } from "../contexts/NavigationGuardContext";
+import { useNavigationGuard } from "../contexts/navigationGuard";
 
 export function useUnsavedChanges(isDirty: boolean) {
   const [state, setState] = useState<"idle" | "blocked">("idle");

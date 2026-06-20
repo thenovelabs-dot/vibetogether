@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { getCurrentPosition, reverseGeocode } from "../lib/naverGeo";
 import { isNicknameAvailable, createUser } from "../api/users";
 import { RegionPicker } from "../components/RegionPicker";
+import { features } from "../config/features";
 
 const ADJS = ["새벽코딩", "커피충전", "집중하는", "열정넘치는", "조용한", "밤샘하는", "느긋한", "바쁜척하는", "진지한", "설레는"];
 const NOUNS = ["수달", "개발자", "빌더", "메이커", "해커", "코더", "디자이너", "기획자", "엔지니어", "창업가"];
@@ -76,7 +77,7 @@ export default function OnboardingNicknameScreen() {
       setNicknameError(nicknameErr || "2자 이상 입력해주세요");
       return;
     }
-    if (!region) {
+    if (features.locationOnboarding && !region) {
       setRegionError("동네를 선택해주세요");
       return;
     }
@@ -99,6 +100,7 @@ export default function OnboardingNicknameScreen() {
         email: session.user.email ?? null,
         lat: coords?.lat,
         lng: coords?.lng,
+        toss_user_key: (session.user.user_metadata?.toss_user_key as string | undefined) ?? null,
       });
     } catch {
       setSaving(false);
@@ -109,7 +111,7 @@ export default function OnboardingNicknameScreen() {
     navigate("/onboarding/aitools", { replace: true });
   }
 
-  const isValid = nickname.trim().length >= 2 && !nicknameError && !!region;
+  const isValid = nickname.trim().length >= 2 && !nicknameError && (!features.locationOnboarding || !!region);
 
   return (
     <div className="flex h-screen">
@@ -118,18 +120,19 @@ export default function OnboardingNicknameScreen() {
         <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl mb-8">💻</div>
         <h1 className="text-[36px] font-bold text-white mb-3">같이바코할사람</h1>
         <p className="text-[18px] text-white/70 leading-relaxed mb-10">
-          동네에서 바이브코딩 모임을<br />열고 참여하는 서비스
+          {features.meetups ? <>동네에서 바이브코딩 모임을<br />열고 참여하는 서비스</> : <>바이브코딩 프로덕트와<br />노하우를 나누는 서비스</>}
         </p>
         <div className="space-y-3">
-          <Feature text="내 동네 기반으로 모임 찾기" />
-          <Feature text="함께하면 더 집중되는 작업 시간" />
-          <Feature text="같은 관심사를 가진 사람들과 교류" />
+          {(features.meetups
+            ? ["내 동네 기반으로 모임 찾기", "함께하면 더 집중되는 작업 시간", "같은 관심사를 가진 사람들과 교류"]
+            : ["프로덕트 쇼케이스 둘러보기", "게시판에서 노하우 공유", "같은 관심사의 메이커 발견"]
+          ).map((text) => <Feature key={text} text={text} />)}
         </div>
       </div>
 
       {/* 우측 폼 */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto">
-        <div className="w-full max-w-md mx-auto px-6 py-12 lg:py-16 flex flex-col flex-1">
+      <div className="flex-1 flex flex-col bg-white min-h-0">
+        <div className="w-full max-w-md mx-auto px-6 py-12 lg:py-16 flex-1 min-h-0 overflow-y-auto">
           {/* 스텝 인디케이터 */}
           <div className="flex items-center gap-1.5 mb-10">
             <div className="h-1 rounded-full bg-[#ae49fd] flex-1" />
@@ -138,7 +141,7 @@ export default function OnboardingNicknameScreen() {
           </div>
 
           <h2 className="text-[20px] font-bold text-[#101828] mb-1">프로필 설정</h2>
-          <p className="text-[14px] text-[#99a1af] mb-10">모임에서 사용할 닉네임과 동네를 알려주세요</p>
+          <p className="text-[14px] text-[#99a1af] mb-10">{features.locationOnboarding ? "모임에서 사용할 닉네임과 동네를 알려주세요" : "서비스에서 사용할 닉네임을 알려주세요"}</p>
 
           {/* 닉네임 */}
           <p className="text-[14px] font-semibold text-[#364153] mb-2">닉네임</p>
@@ -172,50 +175,56 @@ export default function OnboardingNicknameScreen() {
             : <div className="mb-8" />
           }
 
-          {/* 동네 */}
-          <p className="text-[14px] font-semibold text-[#364153] mb-2">동네</p>
-          <button
-            onClick={onGeoLocate}
-            disabled={geoLoading}
-            className={`w-full flex items-center justify-between px-[14px] py-[14px] rounded-xl text-[14px] font-semibold mb-2 disabled:opacity-50 transition-colors ${
-              region && coords ? "bg-[#f4e5ff] text-[#ae49fd]" : "bg-[#f9fafb] text-[#6a7282] hover:bg-[#f3f4f6]"
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <img src={region && coords ? "/icons/location_purple.svg" : "/icons/location.svg"} width={16} height={16} />
-              {geoLoading ? "위치 불러오는 중..." : region && coords ? region : "현재 위치로 자동 설정"}
-            </span>
-            {region && coords && !geoLoading && (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-60">
-                <path d="M4 12a8 8 0 018-8 8 8 0 016.928 4M20 12a8 8 0 01-8 8 8 8 0 01-6.928-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M18 4l2 4h-4M6 20l-2-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
-          {geoError && <p className="mb-2 text-[12px] text-[#99a1af]">{geoError}</p>}
-          {regionError && <p className="mb-2 text-[12px] text-red-500">{regionError}</p>}
+          {features.locationOnboarding && (
+            <>
+              {/* 동네 */}
+              <p className="text-[14px] font-semibold text-[#364153] mb-2">동네</p>
+              <button
+                onClick={onGeoLocate}
+                disabled={geoLoading}
+                className={`w-full flex items-center justify-between px-[14px] py-[14px] rounded-xl text-[14px] font-semibold mb-2 disabled:opacity-50 transition-colors ${
+                  region && coords ? "bg-[#f4e5ff] text-[#ae49fd]" : "bg-[#f9fafb] text-[#6a7282] hover:bg-[#f3f4f6]"
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <img src={region && coords ? "/icons/location_purple.svg" : "/icons/location.svg"} width={16} height={16} />
+                  {geoLoading ? "위치 불러오는 중..." : region && coords ? region : "현재 위치로 자동 설정"}
+                </span>
+                {region && coords && !geoLoading && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-60">
+                    <path d="M4 12a8 8 0 018-8 8 8 0 016.928 4M20 12a8 8 0 01-8 8 8 8 0 01-6.928-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M18 4l2 4h-4M6 20l-2-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+              {geoError && <p className="mb-2 text-[12px] text-[#99a1af]">{geoError}</p>}
+              {regionError && <p className="mb-2 text-[12px] text-red-500">{regionError}</p>}
 
-          {!showSearch && (
-            <button
-              onClick={() => setShowSearch(true)}
-              className="mb-4 self-start text-[13px] text-[#99a1af] hover:text-[#6a7282] transition-colors"
-            >
-              직접 검색하기 →
-            </button>
+              {!showSearch && (
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="mb-4 self-start text-[13px] text-[#99a1af] hover:text-[#6a7282] transition-colors"
+                >
+                  직접 검색하기 →
+                </button>
+              )}
+
+              {showSearch && (
+                <div className="mb-6">
+                  <RegionPicker
+                    value={region}
+                    onChange={(r) => { setRegion(r); setCoords(null); }}
+                  />
+                </div>
+              )}
+
+              {!showSearch && <div className="mb-4" />}
+            </>
           )}
+        </div>
 
-          {showSearch && (
-            <div className="mb-6">
-              <RegionPicker
-                value={region}
-                onChange={(r) => { setRegion(r); setCoords(null); }}
-              />
-            </div>
-          )}
-
-          {!showSearch && <div className="mb-4" />}
-
-          <div className="mt-auto pb-2 safe-bottom">
+        <div className="shrink-0 px-6 pb-2 pt-3 safe-bottom border-t border-[#f1f3f7]">
+          <div className="w-full max-w-md mx-auto">
             <button
               onClick={onComplete}
               disabled={!isValid || saving}

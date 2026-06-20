@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getNoticeById, deleteNotice, ADMIN_EMAIL, type Notice } from "../api/notices";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { supabase } from "../lib/supabase";
 import { ConfirmModal } from "../components/ConfirmModal";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 
 export default function NoticeDetailScreen() {
   const { id } = useParams<{ id: string }>();

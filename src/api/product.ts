@@ -32,15 +32,35 @@ export async function getShowcases(params?: {
   category?: string;
   sort?: "latest" | "popular";
   userId?: string;
+  limit?: number;
 }): Promise<ProductItem[]> {
+  const limit = params?.limit ?? 30;
+  const baseSelect = `
+    id,
+    user_id,
+    title,
+    short_description,
+    detail_description,
+    icon_url,
+    gallery_urls,
+    service_url,
+    sns_url,
+    tags,
+    service_category,
+    product_type,
+    ai_tools,
+    launch_date,
+    like_count,
+    save_count,
+    view_count,
+    created_at,
+    author:users!user_id(nickname, avatar_url)
+  `;
   let query = supabase
     .from("products")
-    .select(`
-      *,
-      author:users!user_id(nickname, avatar_url),
-      liked:product_likes(product_id),
-      saved:product_saves(product_id)
-    `);
+    .select(params?.userId
+      ? `${baseSelect}, liked:product_likes(product_id), saved:product_saves(product_id)`
+      : baseSelect);
 
   if (params?.userId) {
     query = query
@@ -55,7 +75,7 @@ export async function getShowcases(params?: {
   query = query.order(
     params?.sort === "popular" ? "like_count" : "created_at",
     { ascending: false },
-  );
+  ).limit(limit);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -200,8 +220,8 @@ type RawProduct = Record<string, unknown> & {
   launch_date: string | null; like_count: number; save_count: number;
   view_count: number; created_at: string;
   author: { nickname: string } | null;
-  liked: { product_id: string }[];
-  saved: { product_id: string }[];
+  liked?: { product_id: string }[];
+  saved?: { product_id: string }[];
 };
 
 function shapeProduct(raw: RawProduct, userId?: string): ProductItem {

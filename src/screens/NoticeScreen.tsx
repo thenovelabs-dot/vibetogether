@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getNotices, ADMIN_EMAIL, type Notice } from "../api/notices";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { supabase } from "../lib/supabase";
 
 function relativeTime(isoStr: string) {

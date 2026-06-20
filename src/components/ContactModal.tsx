@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sendContactEmail } from "../api/contact";
-import { useToast } from "./Toast";
+import { useToast } from "./toastContext";
 
 const INQUIRY_TAGS = ["질문", "불편한 점", "기능 제안", "버그 신고", "기타", "직접 입력"];
 const REPORT_TAGS = ["스팸", "허위 정보", "부적절한 콘텐츠", "저작권 침해", "기타", "직접 입력"];
@@ -30,7 +30,7 @@ export function ContactModal({ type, senderEmail = "", targetInfo, onClose }: Co
     setSending(true);
     try {
       await sendContactEmail({ type, tag: finalTag, content: content.trim(), senderEmail: email.trim(), targetInfo });
-      toast(type === "inquiry" ? "문의가 전송됐어요" : "신고가 접수됐어요", "success");
+      toast(type === "inquiry" ? "문의가 전송됐어요" : "신고가 접수됐어요", type === "report" ? "report" : "success");
       onClose();
     } catch {
       toast("전송에 실패했어요. 다시 시도해주세요");

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useToast } from "./Toast";
+import { useToast } from "./toastContext";
 
 export function ShareButton() {
   const [copied, setCopied] = useState(false);
@@ -10,7 +10,7 @@ export function ShareButton() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast("링크가 복사됐어요");
+      toast("링크가 복사됐어요", "info");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       try {
@@ -23,7 +23,7 @@ export function ShareButton() {
         document.execCommand("copy");
         document.body.removeChild(ta);
         setCopied(true);
-        toast("링크가 복사됐어요");
+        toast("링크가 복사됐어요", "info");
         setTimeout(() => setCopied(false), 2000);
       } catch {
         toast("링크 복사에 실패했어요");

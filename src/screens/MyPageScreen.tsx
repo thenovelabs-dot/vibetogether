@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import type { ApplicationStatus } from "../types";
 import { updateUserRegion, updateUserAITools, updateUserJobRole, updateUserNickname, uploadUserAvatar, updateUserAvatar, isNicknameAvailable, getMyApplications, getMyMeetups, getCommentedMeetups, getMyProducts, deleteAccount } from "../api/users";
 import { ConfirmModal } from "../components/ConfirmModal";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { RegionPicker } from "../components/RegionPicker";
+import { features } from "../config/features";
 
 const JOB_LABELS: Record<string, string> = {
   developer: "개발자", designer: "디자이너", pm: "기획자 / PM",
@@ -13,7 +14,7 @@ const JOB_LABELS: Record<string, string> = {
   sales: "세일즈", content: "콘텐츠", data: "데이터", other: "기타",
 };
 
-const TABS = ["내가 쓴 글", "댓글 단 글", "내 신청"] as const;
+const TABS = features.meetups ? ["내가 쓴 글", "댓글 단 글", "내 신청"] as const : [] as const;
 type Tab = (typeof TABS)[number];
 
 interface MyApplication {
@@ -29,6 +30,20 @@ interface MyProduct {
   title: string;
   icon_url: string | null;
 }
+
+type RawMyProduct = {
+  id: string;
+  title: string;
+  icon_url?: string | null;
+};
+
+type RawMyApplication = {
+  id: string;
+  status: ApplicationStatus;
+  host_email?: string | null;
+  created_at: string;
+  meetup: MyApplication["meetup"] | MyApplication["meetup"][];
+};
 
 const AVATAR_COLORS = [
   "bg-violet-400", "bg-blue-400", "bg-emerald-400",
@@ -59,7 +74,7 @@ function relativeTime(isoStr: string) {
 
 export default function MyPageScreen() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("내가 쓴 글");
+  const [tab, setTab] = useState<Tab | null>(features.meetups ? "내가 쓴 글" : null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -87,7 +102,7 @@ export default function MyPageScreen() {
     ? AVATAR_COLORS[profile.nickname.charCodeAt(0) % AVATAR_COLORS.length]
     : "bg-violet-400";
 
-  const tabCounts: Record<Tab, number> = {
+  const tabCounts: Partial<Record<Tab, number>> = {
     "내가 쓴 글": myMeetups.length,
     "댓글 단 글": commentedMeetups.length,
     "내 신청": myApplications.length,
@@ -95,37 +110,39 @@ export default function MyPageScreen() {
 
   useEffect(() => {
     if (!session) return;
-    getMyMeetups(session.user.id).then(setMyMeetups).catch(() => {});
-    getCommentedMeetups(session.user.id).then(setCommentedMeetups).catch(() => {});
+    if (features.meetups) {
+      getMyMeetups(session.user.id).then(setMyMeetups).catch(() => {});
+      getCommentedMeetups(session.user.id).then(setCommentedMeetups).catch(() => {});
+    }
     getMyProducts(session.user.id)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data) => setMyProducts(data.map((s: any) => ({ id: s.id, title: s.title, icon_url: s.icon_url ?? null }))))
+      .then((data) => setMyProducts((data as RawMyProduct[]).map((s) => ({ id: s.id, title: s.title, icon_url: s.icon_url ?? null }))))
       .catch(() => {});
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
+    if (!features.meetups) return;
     if (tab === "내 신청") setApplicationsLoading(true);
     getMyApplications(session.user.id)
       .then((data) => setMyApplications(
-        data.map((d) => ({
-          id: d.id as string,
-          status: d.status as ApplicationStatus,
-          host_email: (d as any).host_email ?? null,
-          created_at: d.created_at as string,
-          meetup: Array.isArray(d.meetup) ? (d.meetup[0] ?? null) : (d.meetup as MyApplication["meetup"]),
+        (data as RawMyApplication[]).map((d) => ({
+          id: d.id,
+          status: d.status,
+          host_email: d.host_email ?? null,
+          created_at: d.created_at,
+          meetup: Array.isArray(d.meetup) ? (d.meetup[0] ?? null) : d.meetup,
         }))
       ))
       .catch(() => {})
       .finally(() => setApplicationsLoading(false));
-  }, [session]);
+  }, [session, tab]);
 
   async function shareProfile() {
     const url = `${window.location.origin}/user/${encodeURIComponent(profile?.nickname ?? "")}`;
     try {
       await navigator.clipboard.writeText(url);
       setShareCopied(true);
-      toast("링크가 복사됐어요");
+      toast("링크가 복사됐어요", "info");
       setTimeout(() => setShareCopied(false), 2000);
     } catch {
       toast("링크 복사에 실패했어요");
@@ -158,8 +175,9 @@ export default function MyPageScreen() {
         let url: string;
         try {
           url = await uploadUserAvatar(session.user.id, avatarFile);
-        } catch (e: any) {
-          throw new Error("사진 업로드에 실패했어요: " + (e?.message ?? JSON.stringify(e)));
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : JSON.stringify(e);
+          throw new Error("사진 업로드에 실패했어요: " + message);
         }
         await updateUserAvatar(session.user.id, url);
       }
@@ -172,9 +190,9 @@ export default function MyPageScreen() {
       await refreshProfile();
       toast("프로필이 저장됐어요");
       setEditing(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("saveAll error:", e);
-      toast(e?.message || e?.error_description || JSON.stringify(e) || "저장에 실패했어요");
+      toast(e instanceof Error ? e.message : JSON.stringify(e) || "저장에 실패했어요");
       await refreshProfile().catch(() => {});
     } finally {
       setSaving(false);
@@ -290,14 +308,18 @@ export default function MyPageScreen() {
               <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">프로젝트</p>
             </div>
             <div className="w-px h-8 bg-[#f3f4f6]" />
-            <div className="flex-1 flex flex-col items-center gap-1.5">
-              <p className="text-[18px] font-bold text-[#101828]">{myMeetups.length}</p>
-              <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">작성한 모임</p>
-            </div>
-            <div className="w-px h-8 bg-[#f3f4f6]" />
+            {features.meetups && (
+              <>
+                <div className="flex-1 flex flex-col items-center gap-1.5">
+                  <p className="text-[18px] font-bold text-[#101828]">{myMeetups.length}</p>
+                  <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">작성한 모임</p>
+                </div>
+                <div className="w-px h-8 bg-[#f3f4f6]" />
+              </>
+            )}
             <div className="flex-1 flex flex-col items-center gap-1.5">
               <p className="text-[18px] font-bold text-[#101828]">{commentedMeetups.length}</p>
-              <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">댓글 단 글</p>
+              <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">{features.meetups ? "댓글 단 글" : "활동"}</p>
             </div>
           </div>
         </div>}
@@ -340,7 +362,7 @@ export default function MyPageScreen() {
         )}
 
         {/* 피드 탭 + 아이템 */}
-        {!editing && (
+        {!editing && features.meetups && tab && (
           <div className="flex flex-col gap-3">
             {/* 칩 탭 */}
             <div className="flex gap-2 flex-wrap">
@@ -353,7 +375,7 @@ export default function MyPageScreen() {
                   }`}
                 >
                   <span>{t}</span>
-                  <span className="text-[#ae49fd]">{tabCounts[t]}</span>
+                  <span className="text-[#ae49fd]">{tabCounts[t] ?? 0}</span>
                 </button>
               ))}
             </div>
@@ -732,4 +754,3 @@ function ProfileEditor({ currentNickname, currentAvatarUrl, currentRegion, curre
     </div>
   );
 }
-

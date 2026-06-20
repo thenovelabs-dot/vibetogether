@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "../hooks/useRequireAuth";
-import { useToast } from "./Toast";
+import { useToast } from "./toastContext";
 import type { CommentNode, ReplyNode } from "../api/comments";
 import { UserAvatar } from "./UserAvatar";
+import { ContactModal } from "./ContactModal";
+import { useUser } from "../contexts/userContextValue";
 
 interface Props {
   comments: CommentNode[];
@@ -11,16 +13,20 @@ interface Props {
   onDelete: (id: string) => Promise<void>;
   currentUserId?: string;
   authorId?: string;
+  authorBadgeLabel?: string;
+  reportTargetType?: string;
 }
 
 
-export function CommentSection({ comments, onSubmit, onDelete, currentUserId, authorId }: Props) {
+export function CommentSection({ comments, onSubmit, onDelete, currentUserId, authorId, authorBadgeLabel = "작성자", reportTargetType = "comment" }: Props) {
   const requireAuth = useRequireAuth();
   const { toast } = useToast();
+  const { session } = useUser();
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ rootId: string; parentId: string; mention: string } | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [reportTarget, setReportTarget] = useState<{ id: string; title: string } | null>(null);
 
   const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
 
@@ -67,6 +73,14 @@ export function CommentSection({ comments, onSubmit, onDelete, currentUserId, au
 
   return (
     <div className="bg-white rounded-[16px] p-5">
+      {reportTarget && (
+        <ContactModal
+          type="report"
+          senderEmail={session?.user.email ?? ""}
+          targetInfo={{ type: reportTargetType, title: reportTarget.title, id: reportTarget.id }}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
       <div className="flex items-center gap-[4px] mb-5">
         <span className="text-[14px] font-bold text-[#364153] tracking-[-0.32px]">댓글</span>
         <span className="text-[14px] font-semibold text-[#ae49fd] tracking-[-0.32px]">{totalComments}</span>
@@ -88,7 +102,12 @@ export function CommentSection({ comments, onSubmit, onDelete, currentUserId, au
                 isReplyOpen={replyingTo?.rootId === c.id && replyingTo.parentId === c.id}
                 currentUserId={currentUserId}
                 authorId={authorId}
+                authorBadgeLabel={authorBadgeLabel}
                 onDelete={handleDelete}
+                onReport={(comment) => setReportTarget({
+                  id: comment.id,
+                  title: `댓글: ${comment.content.slice(0, 80)}`,
+                })}
               />
 
               {c.replies.length > 0 && (
@@ -99,7 +118,12 @@ export function CommentSection({ comments, onSubmit, onDelete, currentUserId, au
                       reply={r}
                       currentUserId={currentUserId}
                       authorId={authorId}
+                      authorBadgeLabel={authorBadgeLabel}
                       onDelete={handleDelete}
+                      onReport={(reply) => setReportTarget({
+                        id: reply.id,
+                        title: `댓글: ${reply.content.slice(0, 80)}`,
+                      })}
                       onReply={() => requireAuth(() =>
                         setReplyingTo(replyingTo?.parentId === r.id
                           ? null
@@ -155,13 +179,15 @@ export function CommentSection({ comments, onSubmit, onDelete, currentUserId, au
   );
 }
 
-function CommentItem({ comment, onReply, isReplyOpen, currentUserId, authorId, onDelete }: {
+function CommentItem({ comment, onReply, isReplyOpen, currentUserId, authorId, authorBadgeLabel = "작성자", onDelete, onReport }: {
   comment: CommentNode;
   onReply: () => void;
   isReplyOpen: boolean;
   currentUserId?: string;
   authorId?: string;
+  authorBadgeLabel?: string;
   onDelete: (id: string) => void;
+  onReport: (comment: CommentNode) => void;
 }) {
   const navigate = useNavigate();
   const date = new Date(comment.created_at);
@@ -181,7 +207,7 @@ function CommentItem({ comment, onReply, isReplyOpen, currentUserId, authorId, o
               {comment.nickname}
             </button>
             {isAuthor && (
-              <span className="px-1.5 py-0.5 bg-[#f1f3f7] text-[#9ba2ad] text-[10px] font-bold rounded-full leading-none">작성자</span>
+              <span className="px-1.5 py-0.5 bg-[#f1f3f7] text-[#9ba2ad] text-[10px] font-bold rounded-full leading-none">{authorBadgeLabel}</span>
             )}
             <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px]">{timeStr}</span>
           </div>
@@ -205,17 +231,28 @@ function CommentItem({ comment, onReply, isReplyOpen, currentUserId, authorId, o
               </svg>
             </button>
           )}
+          {!isMine && (
+            <button
+              onClick={() => onReport(comment)}
+              className="w-fit flex items-center justify-center p-[3px] rounded-full bg-[#f5f6f7] hover:bg-[#fee2e2] transition-colors"
+              title="신고"
+            >
+              <img src="/icons/report.svg" width={12} height={12} className="opacity-60" />
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function ReplyItem({ reply, currentUserId, authorId, onDelete, onReply, isReplyOpen }: {
+function ReplyItem({ reply, currentUserId, authorId, authorBadgeLabel = "작성자", onDelete, onReport, onReply, isReplyOpen }: {
   reply: ReplyNode;
   currentUserId?: string;
   authorId?: string;
+  authorBadgeLabel?: string;
   onDelete: (id: string) => void;
+  onReport: (reply: ReplyNode) => void;
   onReply: () => void;
   isReplyOpen: boolean;
 }) {
@@ -231,7 +268,7 @@ function ReplyItem({ reply, currentUserId, authorId, onDelete, onReply, isReplyO
         <div className="flex items-center gap-2">
           <span className="text-[14px] font-bold text-[#101828] tracking-[-0.32px]">{reply.nickname}</span>
           {isAuthor && (
-            <span className="px-1.5 py-0.5 bg-[#f1f3f7] text-[#9ba2ad] text-[10px] font-bold rounded-full leading-none">작성자</span>
+            <span className="px-1.5 py-0.5 bg-[#f1f3f7] text-[#9ba2ad] text-[10px] font-bold rounded-full leading-none">{authorBadgeLabel}</span>
           )}
           <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px]">{timeStr}</span>
         </div>
@@ -257,6 +294,15 @@ function ReplyItem({ reply, currentUserId, authorId, onDelete, onReply, isReplyO
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#99a1af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+            </button>
+          )}
+          {!isMine && (
+            <button
+              onClick={() => onReport(reply)}
+              className="w-fit flex items-center justify-center p-[3px] rounded-full bg-[#f5f6f7] hover:bg-[#fee2e2] transition-colors"
+              title="신고"
+            >
+              <img src="/icons/report.svg" width={11} height={11} className="opacity-60" />
             </button>
           )}
         </div>

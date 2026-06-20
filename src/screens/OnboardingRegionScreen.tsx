@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { getCurrentPosition, reverseGeocode } from "../lib/naverGeo";
 import { createUser } from "../api/users";
 import { regionKey, regionDisplay } from "../lib/regions";
+import { features } from "../config/features";
 
 const SEED_REGIONS: { label: string; key: string }[] = [
   { label: "강남",   key: regionKey("서울", "강남구") },
@@ -57,7 +58,7 @@ export default function OnboardingRegionScreen() {
     }
 
     await refreshProfile();
-    navigate("/meetup", { replace: true });
+    navigate(features.meetups ? "/meetup" : "/home", { replace: true });
   }
 
   return (
@@ -66,7 +67,7 @@ export default function OnboardingRegionScreen() {
         <div className="flex-1 flex flex-col justify-start pt-16">
           <h1 className="text-[20px] font-bold text-[#101828] mb-2">동네를 설정해주세요</h1>
           <p className="text-[14px] text-[#99a1af] mb-8">
-            주변 모임을 찾을 때 기준이 돼요
+            {features.meetups ? "주변 모임을 찾을 때 기준이 돼요" : "프로필과 추천 기준으로 사용돼요"}
           </p>
 
           <button

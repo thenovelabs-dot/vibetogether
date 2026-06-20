@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getPostById, updatePost, uploadBoardImage, deleteBoardImage } from "../api/board";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 
 const CATEGORIES = ["일반", "모각작 후기", "바이브코딩 꿀팁", "바이브코딩 질문"] as const;
 type Category = (typeof CATEGORIES)[number];

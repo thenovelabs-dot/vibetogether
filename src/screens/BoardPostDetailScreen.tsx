@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useRequireAuth } from "../hooks/useRequireAuth";
 import { DotsMenu } from "../components/DotsMenu";
 import { ShareButton } from "../components/ShareButton";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -11,8 +10,8 @@ import { getPostById, deletePost, incrementBoardView, type BoardPost } from "../
 import { getBoardComments, addBoardComment, deleteBoardComment } from "../api/comments";
 import { CommentSection } from "../components/CommentSection";
 import { supabase } from "../lib/supabase";
-import { useUser } from "../contexts/UserContext";
-import { useToast } from "../components/Toast";
+import { useUser } from "../contexts/userContextValue";
+import { useToast } from "../components/toastContext";
 import { UserAvatar } from "../components/UserAvatar";
 
 const CATEGORY_CHIP: Record<string, string> = {
@@ -36,7 +35,6 @@ export default function BoardPostDetailScreen() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { session } = useUser();
-  const requireAuth = useRequireAuth();
 
   const { toast } = useToast();
   const [post, setPost] = useState<BoardPost | null>(null);
@@ -159,77 +157,82 @@ export default function BoardPostDetailScreen() {
       )}
       <div className="flex flex-col gap-4 py-6 px-4 flex-1">
 
-        {/* 본문 카드 */}
-        <div className="bg-white rounded-[16px] px-5 pt-5 pb-3 flex flex-col gap-3">
-          {/* 카테고리 + 제목 + 시간/액션 */}
-          <div className="flex items-start gap-3">
-            <div className="flex-1 flex flex-col gap-3 min-w-0">
-              <span className={`inline-flex self-start px-2 py-[2px] rounded-full text-[12px] font-medium tracking-[-0.32px] ${CATEGORY_CHIP[post.category] ?? "bg-[#f1f3f7] text-[#6a7282]"}`}>
-                {post.category}
-              </span>
-              {post.title && (
-                <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">
-                  {post.title}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-1 shrink-0 mt-0.5">
-              <span className="text-[12px] text-[#99a1af] tracking-[-0.32px]">{relativeTime(post.created_at)}</span>
-              <ShareButton />
-              <DotsMenu items={is_mine
-                ? [
-                    { label: "수정하기", onClick: () => navigate(`/board/${id}/edit`) },
-                    { label: "삭제하기", onClick: () => setConfirmDelete(true), danger: true },
-                  ]
-                : [
-                    { label: "신고하기", onClick: () => setReportOpen(true), danger: true },
-                  ]
-              } />
-            </div>
+        {/* 본문 카드 + 액션버튼 묶음 */}
+        <div className="flex flex-col items-end gap-3">
+          {/* 액션 버튼 (카드 위 오른쪽) */}
+          <div className="flex items-center gap-2">
+            <ShareButton />
+            <DotsMenu items={is_mine
+              ? [
+                  { label: "수정하기", onClick: () => navigate(`/board/${id}/edit`) },
+                  { label: "삭제하기", onClick: () => setConfirmDelete(true), danger: true },
+                ]
+              : [
+                  { label: "신고하기", onClick: () => setReportOpen(true), danger: true },
+                ]
+            } />
           </div>
 
-          {/* 본문 */}
-          <p className="text-[14px] text-[#6a7282] leading-[19.6px] tracking-[-0.32px] whitespace-pre-line">
-            {post.content}
-          </p>
+          {/* 본문 카드 */}
+          <div className="bg-white rounded-[16px] px-5 pt-5 pb-3 flex flex-col gap-3 w-full">
+            {/* 카테고리 + 제목 + 시간 */}
+            <div className="flex items-start gap-3">
+              <div className="flex-1 flex flex-col gap-2 min-w-0">
+                <span className={`inline-flex self-start px-2 py-[2px] rounded-full text-[12px] font-bold tracking-[-0.32px] ${CATEGORY_CHIP[post.category] ?? "bg-[#f1f3f7] text-[#6a7282]"}`}>
+                  {post.category}
+                </span>
+                {post.title && (
+                  <p className="text-[16px] font-semibold text-[#101828] leading-[22.4px] tracking-[-0.32px]">
+                    {post.title}
+                  </p>
+                )}
+              </div>
+              <span className="text-[12px] text-[#99a1af] tracking-[-0.32px] shrink-0 mt-0.5">{relativeTime(post.created_at)}</span>
+            </div>
 
-          {/* 이미지 */}
-          {post.image_urls.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {post.image_urls.map((url, i) => (
-                <button key={i} type="button" onClick={() => setLightboxUrl(url)}>
-                  <img
-                    src={url}
-                    alt=""
-                    className="w-20 h-20 object-cover rounded-[10px] hover:opacity-90 transition-opacity"
-                  />
+            {/* 본문 */}
+            <p className="text-[14px] text-[#6a7282] leading-[19.6px] tracking-[-0.32px] whitespace-pre-line">
+              {post.content}
+            </p>
+
+            {/* 이미지 */}
+            {post.image_urls.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {post.image_urls.map((url, i) => (
+                  <button key={i} type="button" onClick={() => setLightboxUrl(url)}>
+                    <img
+                      src={url}
+                      alt=""
+                      className="w-20 h-20 object-cover rounded-[10px] hover:opacity-90 transition-opacity"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 하단: 댓글+조회수 / 작성자 */}
+            <div className="w-full border-t border-[#f3f4f6] pt-3 flex items-center justify-between">
+              <div className="flex items-center gap-[10px]">
+                <div className="flex items-center gap-[6px]">
+                  <img src="/icons/Comment.svg" width={16} height={16} className="opacity-60" />
+                  <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.comment_count}</span>
+                </div>
+                <div className="flex items-center gap-[6px]">
+                  <img src="/icons/eye.svg" width={16} height={16} className="opacity-60" />
+                  <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.view_count}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate(`/user/${post.author_nickname}`)} className="shrink-0">
+                  <UserAvatar avatarUrl={post.author_avatar_url} nickname={post.author_nickname} className="w-5 h-5 text-[10px]" />
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* 하단: 댓글+조회수 / 작성자 */}
-          <div className="w-full border-t border-[#f3f4f6] pt-3 flex items-center justify-between">
-            <div className="flex items-center gap-[10px]">
-              <div className="flex items-center gap-[6px]">
-                <img src="/icons/Comment.svg" width={16} height={16} className="opacity-60" />
-                <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.comment_count}</span>
+                <button
+                  onClick={() => navigate(`/user/${post.author_nickname}`)}
+                  className="text-[12px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors whitespace-nowrap"
+                >
+                  {post.author_nickname}
+                </button>
               </div>
-              <div className="flex items-center gap-[6px]">
-                <img src="/icons/eye.svg" width={16} height={16} className="opacity-60" />
-                <span className="text-[12px] font-medium text-[#636e7f] tracking-[-0.32px]">{post.view_count}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate(`/user/${post.author_nickname}`)} className="shrink-0">
-                <UserAvatar avatarUrl={post.author_avatar_url} nickname={post.author_nickname} className="w-5 h-5 text-[10px]" />
-              </button>
-              <button
-                onClick={() => navigate(`/user/${post.author_nickname}`)}
-                className="text-[12px] font-semibold text-[#364153] tracking-[-0.32px] hover:text-[#ae49fd] transition-colors whitespace-nowrap"
-              >
-                {post.author_nickname}
-              </button>
             </div>
           </div>
         </div>
@@ -240,6 +243,7 @@ export default function BoardPostDetailScreen() {
           onDelete={handleCommentDelete}
           currentUserId={session?.user.id}
           authorId={post.user_id}
+          reportTargetType="board_comment"
         />
 
       </div>

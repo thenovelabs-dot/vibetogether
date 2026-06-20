@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { searchAll, type SearchResult } from "../api/search";
 import { ShowcaseCard } from "./ProductScreen";
 import type { ProductItem } from "../api/product";
+import { features } from "../config/features";
 
 const TYPE_LABEL: Record<"meetup" | "board", string> = {
   meetup: "모임",
@@ -78,7 +79,7 @@ export default function SearchScreen() {
     timerRef.current = setTimeout(() => {
       setLoading(true);
       setSearchParams({ q: query }, { replace: true });
-      searchAll(query)
+      searchAll(query, { includeMeetups: features.meetups })
         .then(setResults)
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -104,7 +105,7 @@ export default function SearchScreen() {
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="모임, 게시글, 프로덕트 검색"
+              placeholder={features.meetups ? "모임, 게시글, 프로덕트 검색" : "게시글, 프로덕트 검색"}
               className="flex-1 bg-transparent text-[14px] text-[#101828] placeholder:text-[#99a1af] outline-none tracking-[-0.32px]"
             />
             {query && (
@@ -133,7 +134,9 @@ export default function SearchScreen() {
               </svg>
             </div>
             <p className="text-[15px] font-semibold text-[#101828] tracking-[-0.32px]">검색어를 입력해주세요</p>
-            <p className="text-[13px] text-[#99a1af] mt-1 tracking-[-0.32px]">모임, 게시글, 프로덕트를 한번에 검색할 수 있어요</p>
+            <p className="text-[13px] text-[#99a1af] mt-1 tracking-[-0.32px]">
+              {features.meetups ? "모임, 게시글, 프로덕트를 한번에 검색할 수 있어요" : "게시글과 프로덕트를 한번에 검색할 수 있어요"}
+            </p>
           </div>
         ) : hasResults && totalCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -142,7 +145,7 @@ export default function SearchScreen() {
           </div>
         ) : results ? (
           <div className="flex flex-col gap-6">
-            {results.meetups.length > 0 && (
+            {features.meetups && results.meetups.length > 0 && (
               <Section title="모임" count={results.meetups.length}>
                 <div className="flex flex-col gap-2">
                   {results.meetups.map((r) => (

@@ -24,6 +24,7 @@ export async function createUser(params: {
   email?: string | null;
   lat?: number | null;
   lng?: number | null;
+  toss_user_key?: string | null;
 }) {
   const { error } = await supabase.from("users").upsert({
     id: params.id,
@@ -32,6 +33,7 @@ export async function createUser(params: {
     email: params.email ?? null,
     lat: params.lat ?? null,
     lng: params.lng ?? null,
+    toss_user_key: params.toss_user_key ?? null,
   });
   if (error) throw error;
 }

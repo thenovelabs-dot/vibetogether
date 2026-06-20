@@ -5,15 +5,16 @@ import { getShowcaseById, deleteShowcase, toggleLike, incrementProductView, type
 import { getProductComments, addProductComment, deleteProductComment } from "../api/comments";
 import { CommentSection } from "../components/CommentSection";
 import { supabase } from "../lib/supabase";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { DotsMenu } from "../components/DotsMenu";
 import { ShareButton } from "../components/ShareButton";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { ContactModal } from "../components/ContactModal";
 import { LoginPromptModal } from "../components/LoginPromptModal";
 import { DetailSkeleton } from "../components/Skeleton";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { UserAvatar } from "../components/UserAvatar";
+import { features } from "../config/features";
 
 const ICON_GRADIENTS = [
   "from-violet-500 to-purple-700",
@@ -228,10 +229,12 @@ export default function ShowcaseDetailScreen() {
                 onClick={handleToggleLike}
                 className={`h-9 px-2.5 flex items-center gap-1.5 rounded-[12px] transition-colors ${liked ? "bg-[#f4e5ff]" : "bg-[#f5f6f7] hover:bg-[#e9eaec]"}`}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "#ae49fd" : "none"}>
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"
-                    stroke={liked ? "#ae49fd" : "#636e7f"} strokeWidth="1.8" strokeLinejoin="round"/>
-                </svg>
+                <img
+                  src="/icons/heart.svg"
+                  width={16}
+                  height={16}
+                  style={liked ? { filter: "invert(42%) sepia(99%) saturate(747%) hue-rotate(247deg) brightness(101%) contrast(103%)" } : { opacity: 0.6 }}
+                />
                 <span className={`text-[12px] font-semibold tracking-[-0.32px] ${liked ? "text-[#ae49fd]" : "text-[#636e7f]"}`}>{likeCount}</span>
               </button>
               <ShareButton />
@@ -248,7 +251,7 @@ export default function ShowcaseDetailScreen() {
                 }
               />
             </div>
-            {item.service_url && (
+            {features.externalProductLinks && item.service_url && (
               <button
                 onClick={() => window.open(item.service_url!, "_blank", "noopener noreferrer")}
                 className="flex items-center gap-[10px] h-[48px] px-6 bg-[#ae49fd] text-white text-[14px] font-bold rounded-[12px] hover:opacity-90 transition-opacity tracking-[-0.32px] whitespace-nowrap"
@@ -377,7 +380,7 @@ export default function ShowcaseDetailScreen() {
               </div>
             )}
 
-            {item.sns_url && (
+            {features.externalProductLinks && item.sns_url && (
               <div className="flex gap-8 items-center">
                 <div className="flex gap-1.5 items-center w-20 shrink-0">
                   <img src="/icons/link.svg" width={20} height={20} />
@@ -414,6 +417,9 @@ export default function ShowcaseDetailScreen() {
           onSubmit={handleCommentSubmit}
           onDelete={handleCommentDelete}
           currentUserId={session?.user.id}
+          authorId={item.user_id}
+          authorBadgeLabel="메이커"
+          reportTargetType="product_comment"
         />
 
       </div>

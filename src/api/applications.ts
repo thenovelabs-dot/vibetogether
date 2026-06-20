@@ -100,6 +100,13 @@ export interface HostPendingItem {
   pending_count: number;
 }
 
+type MyApplicationRow = {
+  id: string;
+  meetup_id: string;
+  status: ApplicationStatus;
+  meetup: { title: string; start_at: string } | null;
+};
+
 export async function getMyApplicationsWithMeetup(userId: string): Promise<MyApplicationItem[]> {
   const { data, error } = await supabase
     .from("meetup_applications")
@@ -110,7 +117,7 @@ export async function getMyApplicationsWithMeetup(userId: string): Promise<MyApp
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  return ((data ?? []) as MyApplicationRow[]).map((row) => ({
     id: row.id,
     meetup_id: row.meetup_id,
     meetup_title: row.meetup?.title ?? "",

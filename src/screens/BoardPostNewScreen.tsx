@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { createPost, uploadBoardImage } from "../api/board";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
 

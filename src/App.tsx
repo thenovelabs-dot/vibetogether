@@ -26,10 +26,14 @@ import NoticeScreen from "./screens/NoticeScreen";
 import NoticeDetailScreen from "./screens/NoticeDetailScreen";
 import NoticeNewScreen from "./screens/NoticeNewScreen";
 import ToastPreviewScreen from "./screens/ToastPreviewScreen";
+import TermsScreen from "./screens/TermsScreen";
+import PrivacyScreen from "./screens/PrivacyScreen";
 import Layout from "./components/Layout";
-import { UserProvider, useUser } from "./contexts/UserContext";
+import { UserProvider } from "./contexts/UserContext";
+import { useUser } from "./contexts/userContextValue";
 import { ToastProvider } from "./components/Toast";
 import { NavigationGuardProvider } from "./contexts/NavigationGuardContext";
+import { features } from "./config/features";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useUser();
@@ -64,14 +68,16 @@ function AppRoutes() {
       {/* 공개 라우트 — 로그인 없이 탐색 가능 */}
       <Route element={<Layout />}>
         <Route path="/home" element={<FeedScreen />} />
-        <Route path="/meetup" element={<HomeScreen />} />
-        <Route path="/meetup/:id" element={<MeetupDetailScreen />} />
+        {features.meetups && <Route path="/meetup" element={<HomeScreen />} />}
+        {features.meetups && <Route path="/meetup/:id" element={<MeetupDetailScreen />} />}
         <Route path="/board" element={<BoardScreen />} />
         <Route path="/board/:id" element={<BoardPostDetailScreen />} />
         <Route path="/product" element={<ProductScreen />} />
         <Route path="/product/:id" element={<ProductDetailScreen />} />
         <Route path="/user/:nickname" element={<UserProfileScreen />} />
         <Route path="/about" element={<AboutScreen />} />
+        <Route path="/terms" element={<TermsScreen />} />
+        <Route path="/privacy" element={<PrivacyScreen />} />
         <Route path="/search" element={<SearchScreen />} />
         <Route path="/notice" element={<NoticeScreen />} />
         <Route path="/notice/new" element={<NoticeNewScreen />} />
@@ -80,9 +86,9 @@ function AppRoutes() {
 
       {/* 로그인 필요 라우트 */}
       <Route element={<AuthGuard><Layout /></AuthGuard>}>
-        <Route path="/meetup/new" element={<MeetupNewScreen />} />
-        <Route path="/meetup/:id/edit" element={<MeetupEditScreen />} />
-        <Route path="/meetup/:id/applications" element={<ApplicationsScreen />} />
+        {features.meetups && <Route path="/meetup/new" element={<MeetupNewScreen />} />}
+        {features.meetups && <Route path="/meetup/:id/edit" element={<MeetupEditScreen />} />}
+        {features.meetups && <Route path="/meetup/:id/applications" element={<ApplicationsScreen />} />}
         <Route path="/board/new" element={<BoardPostNewScreen />} />
         <Route path="/board/:id/edit" element={<BoardPostEditScreen />} />
         <Route path="/product/new" element={<ProductNewScreen />} />

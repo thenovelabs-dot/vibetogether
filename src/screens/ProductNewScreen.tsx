@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { DayPicker } from "react-day-picker";
 import { ko } from "react-day-picker/locale";
@@ -9,12 +9,10 @@ import { PRODUCT_TYPES } from "../api/product";
 import type { ProductType } from "../api/product";
 import { supabase } from "../lib/supabase";
 import { createShowcase } from "../api/product";
-import { useUser } from "../contexts/UserContext";
-import { useToast } from "../components/Toast";
+import { useUser } from "../contexts/userContextValue";
+import { useToast } from "../components/toastContext";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { ConfirmModal } from "../components/ConfirmModal";
-
-type TechTag = (typeof ALL_TECH_TAGS)[number];
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 

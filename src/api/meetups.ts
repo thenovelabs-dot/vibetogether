@@ -130,8 +130,13 @@ export async function deleteMeetup(id: string) {
   if (error) throw error;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function shapeMeetup(raw: any): Meetup {
+type RawMeetup = Omit<Meetup, "host_nickname" | "host_avatar_url" | "comment_count" | "accepted_count"> & {
+  host: { nickname: string; avatar_url: string | null } | null;
+  comment_count?: { count: number }[];
+  meetup_applications?: { status: string }[];
+};
+
+function shapeMeetup(raw: RawMeetup): Meetup {
   return {
     id: raw.id,
     host_id: raw.host_id,
@@ -148,7 +153,7 @@ function shapeMeetup(raw: any): Meetup {
     status: raw.status,
     view_count: raw.view_count,
     comment_count: raw.comment_count?.[0]?.count ?? 0,
-    accepted_count: (raw.meetup_applications ?? []).filter((a: any) => a.status === "accepted").length,
+    accepted_count: (raw.meetup_applications ?? []).filter((a) => a.status === "accepted").length,
     created_at: raw.created_at,
   };
 }

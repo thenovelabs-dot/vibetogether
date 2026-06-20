@@ -15,7 +15,8 @@ import { getMyCoffeeChats, acceptCoffeeChat, type CoffeeChatIncoming, type Coffe
 import { MeetupCardSkeleton, BoardPostSkeleton } from "../components/Skeleton";
 import { UserAvatar } from "../components/UserAvatar";
 import { ApplicationStatusPanel, ApplicationStatusDrawer } from "../components/ApplicationStatusPanel";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
+import { features } from "../config/features";
 
 type FeedItem =
   | { type: "meetup"; data: Meetup }
@@ -83,7 +84,7 @@ export default function FeedScreen() {
   const fetchFeed = useCallback(() => {
     setLoading(true);
     Promise.all([
-      getMeetups({ sort: "latest" }),
+      features.meetups ? getMeetups({ sort: "latest" }) : Promise.resolve([]),
       getPosts({ sort: "latest" }),
       getShowcases({ sort: "latest" }),
     ])
@@ -103,21 +104,24 @@ export default function FeedScreen() {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (payload: any) => { if (!isViewCountOnlyUpdate(payload)) fetchFeed(); };
-    const channel = supabase
+    let channel = supabase
       .channel("feed_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, handler)
-      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, handler)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_posts" }, handler);
+    if (features.meetups) {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "meetups" }, handler);
+    }
+    const subscription = channel.subscribe();
+    return () => { supabase.removeChannel(subscription); };
   }, [fetchFeed]);
 
   useEffect(() => {
     if (!session) return;
+    if (!features.meetups && !features.coffeechat) return;
     setStatusLoading(true);
     Promise.all([
-      getMyApplicationsWithMeetup(session.user.id),
-      getHostPendingItems(session.user.id),
-      getMyCoffeeChats(),
+      features.meetups ? getMyApplicationsWithMeetup(session.user.id) : Promise.resolve([]),
+      features.meetups ? getHostPendingItems(session.user.id) : Promise.resolve([]),
+      features.coffeechat ? getMyCoffeeChats() : Promise.resolve({ incoming: [], outgoing: [] }),
     ])
       .then(([apps, host, chats]) => {
         setMyApplications(apps);
@@ -126,7 +130,7 @@ export default function FeedScreen() {
         setOutgoingChats(chats.outgoing);
       })
       .catch(() => {})
-      .finally(() => setStatusLoading(false));
+    .finally(() => setStatusLoading(false));
   }, [session]);
 
   const products = getWeeklyProducts(allProducts);
@@ -134,6 +138,7 @@ export default function FeedScreen() {
   const totalStatusCount = myApplications.length + hostPending.length + incomingChats.length + outgoingChats.length;
 
   async function handleAcceptChat(chatId: string) {
+    if (!features.coffeechat) return;
     const result = await acceptCoffeeChat(chatId);
     setIncomingChats((prev) => prev.map((c) =>
       c.id === chatId ? { ...c, status: "accepted" as const, requester_email: result.requester_email } : c
@@ -142,9 +147,11 @@ export default function FeedScreen() {
 
   const now = new Date();
   const feed: FeedItem[] = [
-    ...meetups
-      .filter((m) => m.status !== "closed" && new Date(m.start_at) >= now)
-      .map((m) => ({ type: "meetup" as const, data: m })),
+    ...(features.meetups
+      ? meetups
+        .filter((m) => m.status !== "closed" && new Date(m.start_at) >= now)
+        .map((m) => ({ type: "meetup" as const, data: m }))
+      : []),
     ...posts.map((p) => ({ type: "post" as const, data: p })),
   ].sort(
     (a, b) =>
@@ -155,16 +162,18 @@ export default function FeedScreen() {
   return (
     <div className="flex h-full">
       {/* 모바일 드로어 */}
-      <ApplicationStatusDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        myApplications={myApplications}
-        hostPending={hostPending}
-        incomingChats={incomingChats}
-        outgoingChats={outgoingChats}
-        onAcceptChat={handleAcceptChat}
-        loading={statusLoading}
-      />
+      {(features.meetups || features.coffeechat) && (
+        <ApplicationStatusDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          myApplications={myApplications}
+          hostPending={hostPending}
+          incomingChats={incomingChats}
+          outgoingChats={outgoingChats}
+          onAcceptChat={handleAcceptChat}
+          loading={statusLoading}
+        />
+      )}
 
       {/* 메인 피드 */}
       <div className="flex-1 min-w-0 overflow-y-auto pb-6">
@@ -176,7 +185,7 @@ export default function FeedScreen() {
               <div className="flex flex-col gap-[4px]">
                 <p className="text-[12px] font-medium text-white/40 tracking-[0.6px] uppercase">{weekLabel}</p>
                 <p className="text-[20px] md:text-[24px] font-semibold text-white leading-[27px] md:leading-[30.8px] tracking-[-0.32px]">
-                  이번주 업데이트된 프로덕트를 만나보세요
+                  이번주 업데이트된<br className="md:hidden" /> 프로덕트를 만나보세요
                 </p>
               </div>
               <button
@@ -188,10 +197,16 @@ export default function FeedScreen() {
             </div>
 
             {/* 프로덕트 카드 */}
-            <div className="flex gap-2 mx-auto w-full" style={{ maxWidth: "760px" }}>
+            <div
+              className="flex gap-2 mx-auto w-full overflow-x-auto snap-x snap-mandatory"
+              style={{ maxWidth: "760px" }}
+            >
               {loading || products.length === 0
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex-1 min-w-0 bg-[rgba(255,255,255,0.05)] rounded-[16px] p-[14px] flex flex-col gap-3 animate-pulse">
+                    <div
+                      key={i}
+                      className="shrink-0 snap-start basis-[calc(50%-4px)] bg-[rgba(255,255,255,0.05)] rounded-[16px] p-[14px] flex flex-col gap-3 animate-pulse"
+                    >
                       <div className="w-10 h-10 rounded-[10px] bg-[rgba(255,255,255,0.08)]" />
                       <div className="h-3 rounded bg-[rgba(255,255,255,0.08)] w-3/4" />
                       <div className="h-2.5 rounded bg-[rgba(255,255,255,0.06)] w-full" />
@@ -202,7 +217,7 @@ export default function FeedScreen() {
                     <button
                       key={p.id}
                       onClick={() => navigate(`/product/${p.id}`)}
-                      className="flex-1 min-w-0 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] rounded-[16px] p-[14px] flex flex-col gap-3 text-left transition-all duration-500 animate-[fadeIn_0.4s_ease-out]"
+                      className="shrink-0 snap-start basis-[calc(50%-4px)] bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] rounded-[16px] p-[14px] flex flex-col gap-3 text-left transition-all duration-500 animate-[fadeIn_0.4s_ease-out]"
                     >
                       <div
                         className="w-10 h-10 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center"
@@ -223,7 +238,7 @@ export default function FeedScreen() {
         </div>
 
         {/* 모바일 배지 버튼 — 배너와 피드 사이, lg 이상에서는 숨김 */}
-        {session && totalStatusCount > 0 && (
+        {session && (features.meetups || features.coffeechat) && totalStatusCount > 0 && (
           <div className="lg:hidden px-4 mb-4">
             <button
               onClick={() => setDrawerOpen(true)}
@@ -235,7 +250,7 @@ export default function FeedScreen() {
                     <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <span className="text-[13px] font-semibold text-[#364153] tracking-[-0.32px]">내 모임 현황</span>
+                <span className="text-[13px] font-semibold text-[#364153] tracking-[-0.32px]">내 활동 현황</span>
                 <span className="px-1.5 py-0.5 bg-[#ae49fd] text-white text-[10px] font-bold rounded-full leading-none">
                   {totalStatusCount}
                 </span>
@@ -251,7 +266,7 @@ export default function FeedScreen() {
         {loading ? (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 5 }).map((_, i) =>
-              i % 2 === 0 ? <MeetupCardSkeleton key={i} /> : <BoardPostSkeleton key={i} />
+              features.meetups && i % 2 === 0 ? <MeetupCardSkeleton key={i} /> : <BoardPostSkeleton key={i} />
             )}
           </div>
         ) : feed.length === 0 ? (
@@ -260,7 +275,7 @@ export default function FeedScreen() {
               아직 콘텐츠가 없어요
             </p>
             <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">
-              첫 번째 모임이나 게시글을 남겨보세요
+              첫 번째 게시글을 남겨보세요
             </p>
           </div>
         ) : (
@@ -286,7 +301,7 @@ export default function FeedScreen() {
       </div>
 
       {/* 데스크톱 우측 패널 */}
-      {session && (
+      {session && (features.meetups || features.coffeechat) && (
         <div className="hidden lg:flex flex-col w-[260px] shrink-0 border-l border-[#f3f4f6] overflow-y-auto pt-6 px-4 pb-4">
           <ApplicationStatusPanel
             myApplications={myApplications}

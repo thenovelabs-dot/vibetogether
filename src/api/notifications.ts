@@ -7,39 +7,53 @@ export interface Notification {
   link?: string;
 }
 
-export async function getNotifications(userId: string): Promise<Notification[]> {
-  const [meetupAppRes, appStatusRes, meetupCommentRes, boardCommentRes, productCommentRes, productLikeRes, coffeeChatRes] = await Promise.all([
+export async function getNotifications(
+  userId: string,
+  options: { includeMeetups?: boolean; includeCoffeechat?: boolean } = {},
+): Promise<Notification[]> {
+  const includeMeetups = options.includeMeetups ?? true;
+  const includeCoffeechat = options.includeCoffeechat ?? true;
+  const [meetupAppRes, appStatusRes, meetupCommentRes, boardCommentRes, productCommentRes, productLikeRes, coffeeChatRes, meetupReplyRes, boardReplyRes, productReplyRes] = await Promise.all([
     // 내 모임 신청 (호스트 뷰)
-    supabase
-      .from("meetup_applications")
-      .select("id, created_at, user:users!user_id(nickname), meetup:meetups!meetup_id(id, title, host_id)")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(30),
+    includeMeetups
+      ? supabase
+        .from("meetup_applications")
+        .select("id, created_at, user:users!user_id(nickname), meetup:meetups!meetup_id(id, title, host_id)")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(30)
+      : Promise.resolve({ data: [] }),
     // 내 신청 수락
-    supabase
-      .from("meetup_applications")
-      .select("id, created_at, status, meetup:meetups!meetup_id(id, title)")
-      .eq("user_id", userId)
-      .eq("status", "accepted")
-      .order("created_at", { ascending: false })
-      .limit(10),
+    includeMeetups
+      ? supabase
+        .from("meetup_applications")
+        .select("id, created_at, status, meetup:meetups!meetup_id(id, title)")
+        .eq("user_id", userId)
+        .eq("status", "accepted")
+        .order("created_at", { ascending: false })
+        .limit(10)
+      : Promise.resolve({ data: [] }),
     // 내 모임 댓글
-    supabase
-      .from("meetup_comments")
-      .select("id, created_at, user_id, user:users!user_id(nickname), meetup:meetups!meetup_id(id, title, host_id)")
-      .order("created_at", { ascending: false })
-      .limit(60),
+    includeMeetups
+      ? supabase
+        .from("meetup_comments")
+        .select("id, created_at, user_id, user:users!user_id(nickname), meetup:meetups!meetup_id(id, title, host_id)")
+        .is("parent_id", null)
+        .order("created_at", { ascending: false })
+        .limit(60)
+      : Promise.resolve({ data: [] }),
     // 내 게시글 댓글
     supabase
       .from("board_comments")
       .select("id, created_at, user_id, user:users!user_id(nickname), post:board_posts!post_id(id, title, user_id)")
+      .is("parent_id", null)
       .order("created_at", { ascending: false })
       .limit(60),
     // 내 프로덕트 댓글
     supabase
       .from("product_comments")
       .select("id, created_at, user_id, user:users!user_id(nickname), product:products!product_id(id, title, user_id)")
+      .is("parent_id", null)
       .order("created_at", { ascending: false })
       .limit(60),
     // 내 프로덕트 좋아요
@@ -49,15 +63,39 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
       .order("created_at", { ascending: false })
       .limit(60),
     // 커피챗
+    includeCoffeechat
+      ? supabase
+        .from("coffee_chats")
+        .select("id, status, created_at, requester_id, recipient_id, requester:users!requester_id(nickname), recipient:users!recipient_id(nickname)")
+        .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+        .order("created_at", { ascending: false })
+        .limit(20)
+      : Promise.resolve({ data: [] }),
+    // 내 모임 댓글에 달린 대댓글
+    includeMeetups
+      ? supabase
+        .from("meetup_comments")
+        .select("id, created_at, user_id, user:users!user_id(nickname), meetup:meetups!meetup_id(id, title), parent:meetup_comments!parent_id(user_id)")
+        .not("parent_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(60)
+      : Promise.resolve({ data: [] }),
+    // 내 게시글 댓글에 달린 대댓글
     supabase
-      .from("coffee_chats")
-      .select("id, status, created_at, requester_id, recipient_id, requester:users!requester_id(nickname), recipient:users!recipient_id(nickname)")
-      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+      .from("board_comments")
+      .select("id, created_at, user_id, user:users!user_id(nickname), post:board_posts!post_id(id, title), parent:board_comments!parent_id(user_id)")
+      .not("parent_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(60),
+    // 내 프로덕트 댓글에 달린 대댓글
+    supabase
+      .from("product_comments")
+      .select("id, created_at, user_id, user:users!user_id(nickname), product:products!product_id(id, title), parent:product_comments!parent_id(user_id)")
+      .not("parent_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(60),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: Notification[] = [];
 
   // 내 모임 신청 (호스트)
@@ -135,22 +173,65 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
     });
   }
 
+  // 내 모임 댓글에 달린 대댓글
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const reply of (meetupReplyRes.data ?? []) as any[]) {
+    if ((reply.parent as { user_id?: string } | null)?.user_id !== userId) continue;
+    if (reply.user_id === userId) continue;
+    result.push({
+      id: `meetup_reply_${reply.id}`,
+      message: `${reply.user?.nickname ?? "누군가"}님이 내 댓글에 답글을 달았어요`,
+      time: reply.created_at,
+      link: `/meetup/${reply.meetup?.id}`,
+    });
+  }
+
+  // 내 게시글 댓글에 달린 대댓글
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const reply of (boardReplyRes.data ?? []) as any[]) {
+    if ((reply.parent as { user_id?: string } | null)?.user_id !== userId) continue;
+    if (reply.user_id === userId) continue;
+    result.push({
+      id: `board_reply_${reply.id}`,
+      message: `${reply.user?.nickname ?? "누군가"}님이 내 댓글에 답글을 달았어요`,
+      time: reply.created_at,
+      link: `/board/${reply.post?.id}`,
+    });
+  }
+
+  // 내 프로덕트 댓글에 달린 대댓글
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const reply of (productReplyRes.data ?? []) as any[]) {
+    if ((reply.parent as { user_id?: string } | null)?.user_id !== userId) continue;
+    if (reply.user_id === userId) continue;
+    result.push({
+      id: `product_reply_${reply.id}`,
+      message: `${reply.user?.nickname ?? "누군가"}님이 내 댓글에 답글을 달았어요`,
+      time: reply.created_at,
+      link: `/product/${reply.product?.id}`,
+    });
+  }
+
   // 커피챗 알림
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const chat of (coffeeChatRes.data ?? []) as any[]) {
     if (chat.status === "pending" && chat.recipient_id === userId) {
       // 내가 받은 신청
+      const requesterNickname = chat.requester?.nickname;
       result.push({
         id: `coffeechat_req_${chat.id}`,
-        message: `${chat.requester?.nickname ?? "누군가"}님이 커피챗을 신청했어요 ☕`,
+        message: `${requesterNickname ?? "누군가"}님이 커피챗을 신청했어요 ☕`,
         time: chat.created_at,
+        link: requesterNickname ? `/user/${requesterNickname}` : undefined,
       });
     } else if (chat.status === "accepted" && chat.requester_id === userId) {
       // 내가 보낸 신청이 수락됨
+      const recipientNickname = chat.recipient?.nickname;
       result.push({
         id: `coffeechat_acc_${chat.id}`,
-        message: `${chat.recipient?.nickname ?? "누군가"}님이 커피챗을 수락했어요 ☕`,
+        message: `${recipientNickname ?? "누군가"}님이 커피챗을 수락했어요 ☕`,
         time: chat.created_at,
+        link: recipientNickname ? `/user/${recipientNickname}` : undefined,
       });
     }
   }

@@ -3,9 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getUserByNickname, getMyMeetups, type UserProfile } from "../api/users";
 import { getUserPosts, getUserComments, type BoardPost } from "../api/board";
 import { getMyProducts } from "../api/users";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { requestCoffeeChat, acceptCoffeeChat, getCoffeeChatWith } from "../api/coffeechat";
 import { supabase } from "../lib/supabase";
+import { useToast } from "../components/toastContext";
+import { features } from "../config/features";
 
 const AVATAR_COLORS = [
   "bg-violet-400", "bg-blue-400", "bg-emerald-400",
@@ -47,7 +49,7 @@ interface UserComment {
   created_at: string;
 }
 
-type Tab = "posts" | "comments";
+type Tab = "meetups" | "posts" | "comments";
 
 export default function UserProfileScreen() {
   const { nickname } = useParams<{ nickname: string }>();
@@ -57,7 +59,7 @@ export default function UserProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [products, setProducts] = useState<ProfileProduct[]>([]);
-  const [meetupCount, setMeetupCount] = useState(0);
+  const [meetups, setMeetups] = useState<{ id: string; title: string; place_name: string; start_at: string; created_at: string }[]>([]);
   const [posts, setPosts] = useState<BoardPost[]>([]);
   const [comments, setComments] = useState<UserComment[]>([]);
   const [chatStatus, setChatStatus] = useState<{
@@ -84,10 +86,10 @@ export default function UserProfileScreen() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setProducts(data.map((s: any) => ({ id: s.id, title: s.title, icon_url: s.icon_url ?? null })))
           ),
-          getMyMeetups(p.id).then((m) => setMeetupCount(m.length)),
+          features.meetups ? getMyMeetups(p.id).then(setMeetups) : Promise.resolve(),
           getUserPosts(p.id).then(setPosts),
           getUserComments(p.id).then(setComments),
-          session && getCoffeeChatWith(p.id).then(setChatStatus),
+          session && features.coffeechat ? getCoffeeChatWith(p.id).then(setChatStatus) : Promise.resolve(),
         ]);
       })
       .catch(() => {})
@@ -113,6 +115,7 @@ export default function UserProfileScreen() {
   }
 
   const TABS: { key: Tab; label: string; count: number }[] = [
+    ...(features.meetups ? [{ key: "meetups" as const, label: "모임", count: meetups.length }] : []),
     { key: "posts",    label: "게시물", count: posts.length },
     { key: "comments", label: "댓글",   count: comments.length },
   ];
@@ -147,7 +150,7 @@ export default function UserProfileScreen() {
           <div className="h-px bg-[#f3f4f6]" />
 
           {/* 커피챗 버튼 — 본인 프로필에서는 숨김 */}
-          {session && profile && session.user.id !== profile.id && (
+          {features.coffeechat && session && profile && session.user.id !== profile.id && (
             <CoffeeChatButton
               chatStatus={chatStatus}
               loading={chatLoading}
@@ -160,12 +163,16 @@ export default function UserProfileScreen() {
               <p className="text-[18px] font-bold text-[#101828]">{products.length}</p>
               <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">프로젝트</p>
             </div>
-            <div className="w-px h-8 bg-[#f3f4f6]" />
-            <div className="flex-1 flex flex-col items-center gap-1.5">
-              <p className="text-[18px] font-bold text-[#101828]">{meetupCount}</p>
-              <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">작성한 모임</p>
-            </div>
-            <div className="w-px h-8 bg-[#f3f4f6]" />
+            {features.meetups && (
+              <>
+                <div className="w-px h-8 bg-[#f3f4f6]" />
+                <div className="flex-1 flex flex-col items-center gap-1.5">
+                  <p className="text-[18px] font-bold text-[#101828]">{meetups.length}</p>
+                  <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">작성한 모임</p>
+                </div>
+                <div className="w-px h-8 bg-[#f3f4f6]" />
+              </>
+            )}
             <div className="flex-1 flex flex-col items-center gap-1.5">
               <p className="text-[18px] font-bold text-[#101828]">{posts.length}</p>
               <p className="text-[14px] text-[#99a1af] tracking-[-0.32px]">게시물</p>
@@ -216,6 +223,38 @@ export default function UserProfileScreen() {
               </button>
             ))}
           </div>
+
+          {activeTab === "meetups" && (
+            meetups.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {meetups.map((meetup) => (
+                  <button
+                    key={meetup.id}
+                    onClick={() => navigate(`/meetup/${meetup.id}`)}
+                    className="bg-white rounded-[16px] p-4 flex flex-col gap-1.5 text-left hover:shadow-[0px_4px_10px_rgba(0,0,0,0.1)] transition-shadow"
+                  >
+                    <div className="flex items-start justify-between w-full">
+                      <span className="px-[6px] py-[3px] bg-[#f4e5ff] text-[#ae49fd] text-[10px] font-bold rounded-full tracking-[-0.32px]">
+                        모임
+                      </span>
+                      <span className="text-[12px] font-medium text-[#99a1af] tracking-[-0.32px]">
+                        {relativeTime(meetup.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#101828] tracking-[-0.32px] line-clamp-2">
+                      {meetup.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-[12px] text-[#99a1af] tracking-[-0.32px]">
+                      <img src="/icons/location.svg" width={14} height={14} className="opacity-60" />
+                      <span>{meetup.place_name}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Empty text="아직 개설한 모임이 없어요" />
+            )
+          )}
 
           {activeTab === "posts" && (
             posts.length > 0 ? (
@@ -308,31 +347,57 @@ function CoffeeChatButton({
   loading: boolean;
   onClick: () => void;
 }) {
+  const { toast } = useToast();
+
   if (chatStatus?.status === "accepted") {
     const myEmail = chatStatus.role === "requester" ? chatStatus.recipient_email : chatStatus.requester_email;
+
+    async function handleCopy() {
+      if (!myEmail) return;
+      try {
+        await navigator.clipboard.writeText(myEmail);
+        toast("이메일 복사됐어요", "info");
+      } catch {
+        // clipboard API 실패 시 fallback
+        const el = document.createElement("textarea");
+        el.value = myEmail;
+        el.style.position = "fixed";
+        el.style.opacity = "0";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        toast("이메일 복사됐어요", "info");
+      }
+    }
+
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 px-4 py-3 bg-[#f4e5ff] rounded-[12px]">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
-            <path d="M18 8h1a4 4 0 0 1 0 8h-1" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="6" y1="1" x2="6" y2="4" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="10" y1="1" x2="10" y2="4" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="14" y1="1" x2="14" y2="4" stroke="#ae49fd" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-[#ae49fd] tracking-[-0.32px]">커피챗 연결됨</p>
-            {myEmail && <p className="text-[13px] font-semibold text-[#ae49fd] tracking-[-0.32px] truncate">{myEmail}</p>}
-          </div>
+      <div className="flex items-center justify-between gap-2 px-4 py-3 bg-[#f4e5ff] rounded-[12px]">
+        <div className="flex items-center gap-2">
+          <img src="/icons/coffeechat-purple.svg" width={24} height={24} className="shrink-0" />
+          <p className="text-[14px] font-bold text-[#ae49fd] tracking-[-0.32px]">커피챗 연결됨</p>
         </div>
+        {myEmail && (
+          <div className="flex items-center gap-2">
+            <p className="text-[14px] font-semibold text-black tracking-[-0.32px]">{myEmail}</p>
+            <button
+              onClick={handleCopy}
+              className="shrink-0 opacity-50 hover:opacity-80 transition-opacity"
+              title="이메일 복사"
+            >
+              <img src="/icons/copy_purple.svg" width={16} height={16} />
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   if (chatStatus?.status === "pending" && chatStatus.role === "requester") {
     return (
-      <button disabled className="w-full py-3 bg-[#f3f4f6] text-[#99a1af] text-[14px] font-semibold rounded-[12px] tracking-[-0.32px]">
-        ☕ 커피챗 신청 중...
+      <button disabled className="w-full py-3 bg-[#f3f4f6] text-[#99a1af] text-[14px] font-semibold rounded-[12px] tracking-[-0.32px] flex items-center justify-center gap-2">
+        <img src="/icons/coffeechat_big.svg" width={20} height={20} className="opacity-50" />
+        커피챗 신청 중...
       </button>
     );
   }
@@ -342,9 +407,9 @@ function CoffeeChatButton({
       <button
         onClick={onClick}
         disabled={loading}
-        className="w-full py-3 bg-[#ae49fd] text-white text-[14px] font-semibold rounded-[12px] tracking-[-0.32px] disabled:opacity-60"
+        className="w-full py-3 bg-[#ae49fd] text-white text-[14px] font-semibold rounded-[12px] tracking-[-0.32px] disabled:opacity-60 flex items-center justify-center gap-2"
       >
-        {loading ? "처리 중..." : "☕ 커피챗 수락하기"}
+        {loading ? "처리 중..." : <><img src="/icons/coffeechat_big.svg" width={20} height={20} className="brightness-0 invert" />커피챗 수락하기</>}
       </button>
     );
   }
@@ -353,9 +418,9 @@ function CoffeeChatButton({
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full py-3 bg-[#101828] text-white text-[14px] font-semibold rounded-[12px] tracking-[-0.32px] disabled:opacity-60"
+      className="w-full py-3 bg-[#101828] text-white text-[14px] font-semibold rounded-[12px] tracking-[-0.32px] disabled:opacity-60 flex items-center justify-center gap-2"
     >
-      {loading ? "처리 중..." : "☕ 커피챗 신청하기"}
+      {loading ? "처리 중..." : <><img src="/icons/coffeechat_big.svg" width={20} height={20} className="brightness-0 invert" />커피챗 신청하기</>}
     </button>
   );
 }

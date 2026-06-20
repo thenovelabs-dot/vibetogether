@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createNotice, ADMIN_EMAIL } from "../api/notices";
-import { useUser } from "../contexts/UserContext";
+import { useUser } from "../contexts/userContextValue";
 import { supabase } from "../lib/supabase";
-import { useToast } from "../components/Toast";
+import { useToast } from "../components/toastContext";
 
 export default function NoticeNewScreen() {
   const navigate = useNavigate();
